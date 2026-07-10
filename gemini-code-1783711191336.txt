@@ -1,0 +1,9 @@
+Echipa,Valoare_Lot_Mil,Forta_Atac,Forta_Aparare
+Franta,1150,91,89
+Maroc,350,82,85
+Spania,1000,88,87
+Belgia,550,85,83
+Norvegia,450,86,81
+Anglia,1300,91,87
+Argentina,1050,89,86
+Elvetia,300,81,84

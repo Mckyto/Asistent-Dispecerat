@@ -1,7 +1,7 @@
-Echipa,Valoare_Lot_Mil,Forta_Atac,Forta_Aparare,Med_Marcate,Med_Primite,Factor_Forma,Experienta_Penalti
-Franta,1150,94,95,2.1,0.3,1.05,0.90
-Spania,1000,90,88,2.0,0.5,1.05,0.85
-Norvegia,450,88,82,2.2,1.2,1.0,0.70
-Anglia,1300,92,89,1.9,0.7,1.0,0.80
-Argentina,1050,91,87,2.1,0.8,1.0,0.95
-Elvetia,300,82,86,1.5,1.1,0.95,0.80
+Echipa,Valoare_Lot_Mil,Forta_Atac,Forta_Aparare,Med_Marcate,Med_Primite,Factor_Forma,Experienta_Penalti,Putere_Ofensiva
+Franta,1150,94,95,2.1,0.3,1.05,0.90,92
+Spania,1000,90,88,2.0,0.5,1.05,0.85,89
+Norvegia,450,88,82,2.2,1.2,1.0,0.70,87
+Anglia,1300,92,89,1.9,0.7,1.0,0.80,90
+Argentina,1050,91,87,2.1,0.8,1.0,0.95,91
+Elvetia,300,82,86,1.5,1.1,0.95,0.80,81

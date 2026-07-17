@@ -9,6 +9,22 @@ DATA_DIR = "rapoarte_zilnice"
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(FILE_NAME): open(FILE_NAME, "w").close()
 
+# --- IMPORT ISTORIC (Datele tale) ---
+istoric_preluat = [
+    ("Mihaita", "96", "27.6", "06.07.2026"), ("Mihaita", "87", "26.2", "07.07.2026"),
+    ("Mihaita", "98", "42.4", "09.07.2026"), ("Mihaita", "100", "26.3", "10.07.2026"),
+    ("Mihaita", "90", "47.0", "12.07.2026"), ("Mihaita", "85", "34.1", "13.07.2026"),
+    ("Mihaita", "112", "26.8", "15.07.2026"), ("Mihaita", "95", "35.6", "16.07.2026")
+]
+
+for nume, com, tgt, data in istoric_preluat:
+    # Generăm un timestamp fictiv pentru sortare (folosind data)
+    d_obj = datetime.strptime(data, "%d.%m.%Y")
+    ts = d_obj.strftime("%Y%m%d") + "000000"
+    cale = f"{DATA_DIR}/raport_{nume}_{data.replace('.', '_')}_{ts}.txt"
+    if not os.path.exists(cale):
+        with open(cale, "w") as f: f.write(f"{nume}|{com}|{tgt}")
+
 # --- FUNCȚII ---
 def incarca_livratori():
     if os.path.exists(FILE_NAME):
@@ -34,13 +50,10 @@ PRODUSE_BONUS = {
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
 
-# --- TAB-URI ---
 tab1, tab2 = st.tabs(["⚙️ Dispecerat & Target", "🛵 Gestionare Livratori"])
 
-# --- TAB 1: DISPECERAT ---
 with tab1:
     if 'lista_produse' not in st.session_state: st.session_state['lista_produse'] = []
-    
     col_op, col_st, col_ac = st.columns(3)
     operator = col_op.text_input("👤 Operator:", value="Operator1")
     start = col_st.number_input("Start:", value=0)
@@ -49,7 +62,6 @@ with tab1:
     st.info(f"✅ {actual - start} comenzi în total.")
     
     c1, c2 = st.columns([0.4, 0.6])
-    
     with c1:
         with st.expander("🧮 Calculator Discount", expanded=True):
             p = st.number_input("Total (preț):", format="%.2f")
@@ -57,11 +69,11 @@ with tab1:
             if st.button("Calculează Discount"): st.success(f"Diferență: {p - s:.2f}")
         
         if st.button("💾 Salvează și Închide Tura"):
-            d_data = datetime.now().strftime("%d_%m_%Y")
+            d_t = datetime.now().strftime("%d_%m_%Y_%H%M%S")
             t_t = sum(i['val'] for i in st.session_state['lista_produse'])
-            with open(f"{DATA_DIR}/raport_{operator}_{d_data}_{datetime.now().strftime('%H%M%S')}.txt", "w") as f:
+            with open(f"{DATA_DIR}/raport_{operator}_{datetime.now().strftime('%d_%m_%Y')}_{d_t}.txt", "w") as f:
                 f.write(f"{operator}|{actual - start}|{t_t}")
-            st.success("Salvat!")
+            st.success("Salvat în istoric!")
             st.session_state['lista_produse'] = []
             st.rerun()
 
@@ -85,7 +97,6 @@ with tab1:
                 st.write(f"### Total: {sum(i['val'] for i in st.session_state['lista_produse']):.2f}")
                 if st.button("RESET TARGET"): st.session_state['lista_produse'] = []; st.rerun()
 
-    st.divider()
     with st.expander("📊 Centralizator Ture"):
         parola = st.text_input("🔑 Parolă Centralizator:", type="password")
         if parola == "4676":
@@ -100,26 +111,17 @@ with tab1:
                     if c_r2.button("❌", key=f"del_{f_n}"): os.remove(f"{DATA_DIR}/{f_n}"); st.rerun()
         elif parola: st.error("Parolă incorectă!")
 
-# --- TAB 2: LIVRATORI ---
 with tab2:
     with st.expander("➕ Adaugă livrator nou"):
         n_n = st.text_input("Nume livrator:")
         if st.button("Salvează livrator"):
             l = incarca_livratori(); l.insert(0, n_n); salveaza_livratori(l); st.rerun()
-
     cautare = st.text_input("🔎 Căutare livrator:")
     if cautare:
-        livr = incarca_livratori()
-        gasit = False
-        for n in livr:
+        for n in incarca_livratori():
             if cautare.lower() in n.lower():
-                gasit = True
                 with st.container(border=True):
                     c_i, c_a = st.columns([0.7, 0.3])
                     c_i.markdown(f"**{n.upper()}**")
                     if c_a.button("Șterge", key=f"d_{n}"):
                         l = incarca_livratori(); l.remove(n); salveaza_livratori(l); st.rerun()
-        if not gasit:
-            st.warning(f"Livratorul '{cautare}' nu există.")
-            if st.button(f"➕ Adaugă-l pe '{cautare}' acum?"):
-                l = incarca_livratori(); l.insert(0, cautare); salveaza_livratori(l); st.rerun()

@@ -93,7 +93,7 @@ with tab1:
                     salveaza_sesiune(operator, start, actual, s['lista']); st.rerun()
                 if cols[2].button("➕", key=f"add_{produs}"):
                     ora = datetime.now().strftime("%H:%M")
-                    s['lista'].append({"nume": produs, "val": val, "ora": ora})
+                    s['lista'].append({"nume": produs, "val": f"{val} lei", "ora": ora})
                     salveaza_sesiune(operator, start, actual, s['lista']); st.rerun()
             
             if s['lista']:
@@ -102,7 +102,9 @@ with tab1:
                 df = pd.DataFrame(s['lista'])
                 cols_to_show = [c for c in ['ora', 'nume', 'val'] if c in df.columns]
                 st.table(df[cols_to_show])
-                st.write(f"### Total: {sum(i['val'] for i in s['lista']):.2f}")
+                # Calculăm totalul transformând string-ul în float
+                total_val = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
+                st.write(f"### Total: {total_val:.2f} lei")
                 if st.button("RESET TARGET"): salveaza_sesiune(operator, start, actual, []); st.rerun()
 
     with st.expander("📊 Centralizator Ture"):
@@ -122,7 +124,7 @@ with tab1:
                         total_com += int(com); total_tgt += float(tgt)
                     except: continue
             st.metric("Total Comenzi", total_com)
-            st.metric("Total Target", f"{total_tgt:.2f}")
+            st.metric("Total Target", f"{total_tgt:.2f} lei")
         elif parola: st.error("Parolă incorectă!")
 
 with tab2:

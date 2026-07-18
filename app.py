@@ -18,7 +18,6 @@ istoric_preluat = [
 ]
 
 for nume, com, tgt, data in istoric_preluat:
-    # Generăm un timestamp fictiv pentru sortare (folosind data)
     d_obj = datetime.strptime(data, "%d.%m.%Y")
     ts = d_obj.strftime("%Y%m%d") + "000000"
     cale = f"{DATA_DIR}/raport_{nume}_{data.replace('.', '_')}_{ts}.txt"
@@ -100,15 +99,21 @@ with tab1:
     with st.expander("📊 Centralizator Ture"):
         parola = st.text_input("🔑 Parolă Centralizator:", type="password")
         if parola == "4676":
+            total_com, total_tgt = 0, 0
             fisiere = sorted([f for f in os.listdir(DATA_DIR) if f.startswith("raport_")])
             for f_n in fisiere:
                 with open(f"{DATA_DIR}/{f_n}", "r") as f:
-                    parti = f_n.replace(".txt", "").split("_")
-                    data_afisata = f"{parti[2]}.{parti[3]}.{parti[4]}"
-                    op, com, tgt = f.read().split('|')
-                    c_r1, c_r2 = st.columns([0.8, 0.2])
-                    c_r1.write(f"📄 **{data_afisata}** | {op} | {com} com | {tgt} lei")
-                    if c_r2.button("❌", key=f"del_{f_n}"): os.remove(f"{DATA_DIR}/{f_n}"); st.rerun()
+                    try:
+                        parti = f_n.replace(".txt", "").split("_")
+                        data_afisata = f"{parti[2]}.{parti[3]}.{parti[4]}"
+                        op, com, tgt = f.read().split('|')
+                        col1, col2 = st.columns([0.8, 0.2])
+                        col1.write(f"📄 **{data_afisata}** | {op} | {com} com | {tgt} lei")
+                        if col2.button("❌", key=f"del_{f_n}"): os.remove(f"{DATA_DIR}/{f_n}"); st.rerun()
+                        total_com += int(com); total_tgt += float(tgt)
+                    except: continue
+            st.metric("Total Comenzi", total_com)
+            st.metric("Total Target", f"{total_tgt:.2f}")
         elif parola: st.error("Parolă incorectă!")
 
 with tab2:

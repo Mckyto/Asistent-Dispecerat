@@ -93,11 +93,14 @@ with tab1:
             
             if s['lista']:
                 st.divider()
+                st.write("📋 **Istoric adăugări:**")
                 df = pd.DataFrame(s['lista'])
-                # Afișăm valoarea formatată frumos în tabel
-                df_viz = df.copy()
-                df_viz['val'] = df_viz['val'].apply(lambda x: f"{float(x):.2f} lei")
-                st.table(df_viz[['ora', 'nume', 'val']])
+                # Verificăm explicit existența coloanelor înainte de selecție
+                cols_to_use = ['ora', 'nume', 'val']
+                if all(col in df.columns for col in cols_to_use):
+                    df_viz = df.copy()
+                    df_viz['val'] = df_viz['val'].apply(lambda x: f"{float(x):.2f} lei")
+                    st.table(df_viz[cols_to_use])
                 st.write(f"### Total: {sum(float(i['val']) for i in s['lista']):.2f} lei")
                 if st.button("RESET TARGET"): salveaza_sesiune(operator, start, actual, []); st.rerun()
 
@@ -110,9 +113,10 @@ with tab1:
                 with open(f"{DATA_DIR}/{f_n}", "r") as f:
                     try:
                         op, com, tgt = f.read().split('|')
-                        data_afis = f_n.split('_')[2] + "." + f_n.split('_')[3] + "." + f_n.split('_')[4]
+                        parti = f_n.split('_')
+                        data_afis = f"{parti[2]}.{parti[3]}.{parti[4]}"
                         col_a, col_b = st.columns([0.8, 0.2])
-                        col_a.write(f"📄 **{data_afisansat := data_afis}** | {op} | {com} com | {float(tgt):.2f} lei")
+                        col_a.write(f"📄 **{data_afis}** | {op} | {com} com | {float(tgt):.2f} lei")
                         if col_b.button("❌", key=f"del_{f_n}"): os.remove(f"{DATA_DIR}/{f_n}"); st.rerun()
                         total_com += int(com); total_tgt += float(tgt)
                     except: continue
@@ -120,5 +124,20 @@ with tab1:
             st.metric("Total Target", f"{total_tgt:.2f} lei")
 
 with tab2:
-    # (Restul codului pentru livratori rămâne la fel)
-    pass
+    with st.expander("➕ Adaugă livrator nou"):
+        n_n = st.text_input("Nume livrator:")
+        if st.button("Salvează livrator"):
+            l = [l.strip() for l in open(FILE_NAME).readlines()]; l.insert(0, n_n)
+            with open(FILE_NAME, "w") as f: f.write("\n".join(l))
+            st.rerun()
+    cautare = st.text_input("🔎 Căutare livrator:")
+    if cautare:
+        for n in [l.strip() for l in open(FILE_NAME).readlines()]:
+            if cautare.lower() in n.lower():
+                with st.container(border=True):
+                    c_i, c_a = st.columns([0.7, 0.3])
+                    c_i.markdown(f"**{n.upper()}**")
+                    if c_a.button("Șterge", key=f"d_{n}"):
+                        l = [x.strip() for x in open(FILE_NAME).readlines()]; l.remove(n)
+                        with open(FILE_NAME, "w") as f: f.write("\n".join(l))
+                        st.rerun()

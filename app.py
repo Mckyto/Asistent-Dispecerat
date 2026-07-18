@@ -1,30 +1,26 @@
 import streamlit as st
 import os
 import pandas as pd
+import json
 from datetime import datetime
 
 # --- CONFIGURARE ---
 FILE_NAME = 'contacte.txt'
 DATA_DIR = "rapoarte_zilnice"
+STATE_FILE = "sesiune_persistenta.json" # Fișier pentru a nu pierde datele la refresh
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(FILE_NAME): open(FILE_NAME, "w").close()
 
-# --- IMPORT ISTORIC (Datele tale) ---
-istoric_preluat = [
-    ("Mihaita", "96", "27.6", "06.07.2026"), ("Mihaita", "87", "26.2", "07.07.2026"),
-    ("Mihaita", "98", "42.4", "09.07.2026"), ("Mihaita", "100", "26.3", "10.07.2026"),
-    ("Mihaita", "90", "47.0", "12.07.2026"), ("Mihaita", "85", "34.1", "13.07.2026"),
-    ("Mihaita", "112", "26.8", "15.07.2026"), ("Mihaita", "95", "35.6", "16.07.2026")
-]
+# --- FUNCȚII PERSISTENȚĂ ---
+def salveaza_sesiune(op, start, actual, lista):
+    with open(STATE_FILE, "w") as f:
+        json.dump({"op": op, "start": start, "actual": actual, "lista": lista}, f)
 
-for nume, com, tgt, data in istoric_preluat:
-    d_obj = datetime.strptime(data, "%d.%m.%Y")
-    ts = d_obj.strftime("%Y%m%d") + "000000"
-    cale = f"{DATA_DIR}/raport_{nume}_{data.replace('.', '_')}_{ts}.txt"
-    if not os.path.exists(cale):
-        with open(cale, "w") as f: f.write(f"{nume}|{com}|{tgt}")
+def incarca_sesiune():
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f: return json.load(f)
+    return {"op": "Operator1", "start": 0, "actual": 0, "lista": []}
 
-# --- FUNCȚII ---
 def incarca_livratori():
     if os.path.exists(FILE_NAME):
         with open(FILE_NAME, "r") as f: return [l.strip() for l in f.readlines() if l.strip()]
@@ -33,6 +29,20 @@ def incarca_livratori():
 def salveaza_livratori(lista):
     with open(FILE_NAME, "w") as f:
         for nume in lista: f.write(nume + "\n")
+
+# --- IMPORT ISTORIC ---
+istoric_preluat = [
+    ("Mihaita", "96", "27.6", "06.07.2026"), ("Mihaita", "87", "26.2", "07.07.2026"),
+    ("Mihaita", "98", "42.4", "09.07.2026"), ("Mihaita", "100", "26.3", "10.07.2026"),
+    ("Mihaita", "90", "47.0", "12.07.2026"), ("Mihaita", "85", "34.1", "13.07.2026"),
+    ("Mihaita", "112", "26.8", "15.07.2026"), ("Mihaita", "95", "35.6", "16.07.2026")
+]
+for nume, com, tgt, data in istoric_preluat:
+    d_obj = datetime.strptime(data, "%d.%m.%Y")
+    ts = d_obj.strftime("%Y%m%d") + "000000"
+    cale = f"{DATA_DIR}/raport_{nume}_{data.replace('.', '_')}_{ts}.txt"
+    if not os.path.exists(cale):
+        with open(cale, "w") as f: f.write(f"{nume}|{com}|{tgt}")
 
 PRODUSE_BONUS = {
     "Baclava": 1.0, "Tiramisu": 1.0, "Cheesecake": 1.0, "Kataif": 1.0, 
@@ -49,14 +59,18 @@ PRODUSE_BONUS = {
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
 
+# --- RECUPERARE SESIUNE ---
+s = incarca_sesiune()
 tab1, tab2 = st.tabs(["⚙️ Dispecerat & Target", "🛵 Gestionare Livratori"])
 
 with tab1:
-    if 'lista_produse' not in st.session_state: st.session_state['lista_produse'] = []
     col_op, col_st, col_ac = st.columns(3)
-    operator = col_op.text_input("👤 Operator:", value="Operator1")
-    start = col_st.number_input("Start:", value=0)
-    actual = col_ac.number_input("Act:", value=0)
+    operator = col_op.text_input("👤 Operator:", value=s['op'])
+    start = col_st.number_input("Start:", value=s['start'])
+    actual = col_ac.number_input("Act:", value=s['actual'])
+    
+    # Auto-salvare la fiecare schimbare
+    salveaza_sesiune(operator, start, actual, s['lista'])
     
     st.info(f"✅ {actual - start} comenzi în total.")
     
@@ -64,16 +78,16 @@ with tab1:
     with c1:
         with st.expander("🧮 Calculator Discount", expanded=True):
             p = st.number_input("Total (preț):", format="%.2f")
-            s = st.number_input("Încasat:", format="%.2f")
-            if st.button("Calculează Discount"): st.success(f"Diferență: {p - s:.2f}")
+            s_val = st.number_input("Încasat:", format="%.2f")
+            if st.button("Calculează Discount"): st.success(f"Diferență: {p - s_val:.2f}")
         
         if st.button("💾 Salvează și Închide Tura"):
             d_t = datetime.now().strftime("%d_%m_%Y_%H%M%S")
-            t_t = sum(i['val'] for i in st.session_state['lista_produse'])
+            t_t = sum(i['val'] for i in s['lista'])
             with open(f"{DATA_DIR}/raport_{operator}_{datetime.now().strftime('%d_%m_%Y')}_{d_t}.txt", "w") as f:
                 f.write(f"{operator}|{actual - start}|{t_t}")
             st.success("Salvat în istoric!")
-            st.session_state['lista_produse'] = []
+            salveaza_sesiune("Operator1", 0, 0, []) # Reset la zero în fișier
             st.rerun()
 
     with c2:
@@ -82,19 +96,20 @@ with tab1:
                 cols = st.columns([0.6, 0.2, 0.2])
                 cols[0].markdown(f"**{produs}**")
                 if cols[1].button("➖", key=f"sub_{produs}"):
-                    for i in reversed(range(len(st.session_state['lista_produse']))):
-                        if st.session_state['lista_produse'][i]['nume'] == produs:
-                            del st.session_state['lista_produse'][i]; break
-                    st.rerun()
+                    for i in reversed(range(len(s['lista']))):
+                        if s['lista'][i]['nume'] == produs:
+                            del s['lista'][i]; break
+                    salveaza_sesiune(operator, start, actual, s['lista']); st.rerun()
                 if cols[2].button("➕", key=f"add_{produs}"):
-                    st.session_state['lista_produse'].append({"nume": produs, "val": val}); st.rerun()
+                    s['lista'].append({"nume": produs, "val": val})
+                    salveaza_sesiune(operator, start, actual, s['lista']); st.rerun()
             
-            if st.session_state['lista_produse']:
+            if s['lista']:
                 st.divider()
-                df = pd.DataFrame(st.session_state['lista_produse'])
+                df = pd.DataFrame(s['lista'])
                 st.table(df.groupby('nume').size().reset_index(name='buc'))
-                st.write(f"### Total: {sum(i['val'] for i in st.session_state['lista_produse']):.2f}")
-                if st.button("RESET TARGET"): st.session_state['lista_produse'] = []; st.rerun()
+                st.write(f"### Total: {sum(i['val'] for i in s['lista']):.2f}")
+                if st.button("RESET TARGET"): salveaza_sesiune(operator, start, actual, []); st.rerun()
 
     with st.expander("📊 Centralizator Ture"):
         parola = st.text_input("🔑 Parolă Centralizator:", type="password")
@@ -107,9 +122,9 @@ with tab1:
                         parti = f_n.replace(".txt", "").split("_")
                         data_afisata = f"{parti[2]}.{parti[3]}.{parti[4]}"
                         op, com, tgt = f.read().split('|')
-                        col1, col2 = st.columns([0.8, 0.2])
-                        col1.write(f"📄 **{data_afisata}** | {op} | {com} com | {tgt} lei")
-                        if col2.button("❌", key=f"del_{f_n}"): os.remove(f"{DATA_DIR}/{f_n}"); st.rerun()
+                        col_a, col_b = st.columns([0.8, 0.2])
+                        col_a.write(f"📄 **{data_afisata}** | {op} | {com} com | {tgt} lei")
+                        if col_b.button("❌", key=f"del_{f_n}"): os.remove(f"{DATA_DIR}/{f_n}"); st.rerun()
                         total_com += int(com); total_tgt += float(tgt)
                     except: continue
             st.metric("Total Comenzi", total_com)

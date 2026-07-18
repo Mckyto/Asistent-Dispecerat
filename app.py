@@ -7,7 +7,7 @@ from datetime import datetime
 # --- CONFIGURARE ---
 FILE_NAME = 'contacte.txt'
 DATA_DIR = "rapoarte_zilnice"
-STATE_FILE = "sesiune_persistenta.json" # Fișier pentru a nu pierde datele la refresh
+STATE_FILE = "sesiune_persistenta.json"
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(FILE_NAME): open(FILE_NAME, "w").close()
 
@@ -18,17 +18,9 @@ def salveaza_sesiune(op, start, actual, lista):
 
 def incarca_sesiune():
     if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, "r") as f: return json.load(f)
+        with open(STATE_FILE, "r") as f: 
+            return json.load(f)
     return {"op": "Operator1", "start": 0, "actual": 0, "lista": []}
-
-def incarca_livratori():
-    if os.path.exists(FILE_NAME):
-        with open(FILE_NAME, "r") as f: return [l.strip() for l in f.readlines() if l.strip()]
-    return []
-
-def salveaza_livratori(lista):
-    with open(FILE_NAME, "w") as f:
-        for nume in lista: f.write(nume + "\n")
 
 # --- IMPORT ISTORIC ---
 istoric_preluat = [
@@ -59,8 +51,9 @@ PRODUSE_BONUS = {
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
 
-# --- RECUPERARE SESIUNE ---
+# --- RECUPERARE DIN FIȘIER ---
 s = incarca_sesiune()
+
 tab1, tab2 = st.tabs(["⚙️ Dispecerat & Target", "🛵 Gestionare Livratori"])
 
 with tab1:
@@ -69,16 +62,17 @@ with tab1:
     start = col_st.number_input("Start:", value=s['start'])
     actual = col_ac.number_input("Act:", value=s['actual'])
     
-    # Auto-salvare la fiecare schimbare
-    salveaza_sesiune(operator, start, actual, s['lista'])
+    # Salvare automată când modifici operatorul sau numerele
+    if operator != s['op'] or start != s['start'] or actual != s['actual']:
+        salveaza_sesiune(operator, start, actual, s['lista'])
     
     st.info(f"✅ {actual - start} comenzi în total.")
     
     c1, c2 = st.columns([0.4, 0.6])
     with c1:
         with st.expander("🧮 Calculator Discount", expanded=True):
-            p = st.number_input("Total (preț):", format="%.2f")
-            s_val = st.number_input("Încasat:", format="%.2f")
+            p = st.number_input("Total (preț):", format="%.2f", key="p_calc")
+            s_val = st.number_input("Încasat:", format="%.2f", key="s_calc")
             if st.button("Calculează Discount"): st.success(f"Diferență: {p - s_val:.2f}")
         
         if st.button("💾 Salvează și Închide Tura"):
@@ -87,7 +81,7 @@ with tab1:
             with open(f"{DATA_DIR}/raport_{operator}_{datetime.now().strftime('%d_%m_%Y')}_{d_t}.txt", "w") as f:
                 f.write(f"{operator}|{actual - start}|{t_t}")
             st.success("Salvat în istoric!")
-            salveaza_sesiune("Operator1", 0, 0, []) # Reset la zero în fișier
+            salveaza_sesiune("Operator1", 0, 0, []) # Reset
             st.rerun()
 
     with c2:
@@ -135,13 +129,17 @@ with tab2:
     with st.expander("➕ Adaugă livrator nou"):
         n_n = st.text_input("Nume livrator:")
         if st.button("Salvează livrator"):
-            l = incarca_livratori(); l.insert(0, n_n); salveaza_livratori(l); st.rerun()
+            l = [l.strip() for l in open(FILE_NAME).readlines()]; l.insert(0, n_n)
+            with open(FILE_NAME, "w") as f: f.write("\n".join(l))
+            st.rerun()
     cautare = st.text_input("🔎 Căutare livrator:")
     if cautare:
-        for n in incarca_livratori():
+        for n in [l.strip() for l in open(FILE_NAME).readlines()]:
             if cautare.lower() in n.lower():
                 with st.container(border=True):
                     c_i, c_a = st.columns([0.7, 0.3])
                     c_i.markdown(f"**{n.upper()}**")
                     if c_a.button("Șterge", key=f"d_{n}"):
-                        l = incarca_livratori(); l.remove(n); salveaza_livratori(l); st.rerun()
+                        l = [x.strip() for x in open(FILE_NAME).readlines()]; l.remove(n)
+                        with open(FILE_NAME, "w") as f: f.write("\n".join(l))
+                        st.rerun()

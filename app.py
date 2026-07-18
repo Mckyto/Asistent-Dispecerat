@@ -18,7 +18,8 @@ def salveaza_sesiune(op, start, actual, lista):
 
 def incarca_sesiune():
     if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, "r") as f: return json.load(f)
+        with open(STATE_FILE, "r") as f: 
+            return json.load(f)
     return {"op": "Operator1", "start": 0, "actual": 0, "lista": []}
 
 # --- IMPORT ISTORIC ---
@@ -99,7 +100,8 @@ with tab1:
                 st.divider()
                 st.write("📋 **Istoric adăugări:**")
                 df = pd.DataFrame(s['lista'])
-                st.table(df[['ora', 'nume', 'val']]) # Afișează ora, produsul și valoarea
+                cols_to_show = [c for c in ['ora', 'nume', 'val'] if c in df.columns]
+                st.table(df[cols_to_show])
                 st.write(f"### Total: {sum(i['val'] for i in s['lista']):.2f}")
                 if st.button("RESET TARGET"): salveaza_sesiune(operator, start, actual, []); st.rerun()
 

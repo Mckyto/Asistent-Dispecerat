@@ -18,8 +18,7 @@ def salveaza_sesiune(op, start, actual, lista):
 
 def incarca_sesiune():
     if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, "r") as f: 
-            return json.load(f)
+        with open(STATE_FILE, "r") as f: return json.load(f)
     return {"op": "Operator1", "start": 0, "actual": 0, "lista": []}
 
 # --- IMPORT ISTORIC ---
@@ -51,9 +50,7 @@ PRODUSE_BONUS = {
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
 
-# --- RECUPERARE DIN FIȘIER ---
 s = incarca_sesiune()
-
 tab1, tab2 = st.tabs(["⚙️ Dispecerat & Target", "🛵 Gestionare Livratori"])
 
 with tab1:
@@ -62,7 +59,6 @@ with tab1:
     start = col_st.number_input("Start:", value=s['start'])
     actual = col_ac.number_input("Act:", value=s['actual'])
     
-    # Salvare automată când modifici operatorul sau numerele
     if operator != s['op'] or start != s['start'] or actual != s['actual']:
         salveaza_sesiune(operator, start, actual, s['lista'])
     
@@ -71,8 +67,8 @@ with tab1:
     c1, c2 = st.columns([0.4, 0.6])
     with c1:
         with st.expander("🧮 Calculator Discount", expanded=True):
-            p = st.number_input("Total (preț):", format="%.2f", key="p_calc")
-            s_val = st.number_input("Încasat:", format="%.2f", key="s_calc")
+            p = st.number_input("Total (preț):", format="%.2f")
+            s_val = st.number_input("Încasat:", format="%.2f")
             if st.button("Calculează Discount"): st.success(f"Diferență: {p - s_val:.2f}")
         
         if st.button("💾 Salvează și Închide Tura"):
@@ -81,11 +77,11 @@ with tab1:
             with open(f"{DATA_DIR}/raport_{operator}_{datetime.now().strftime('%d_%m_%Y')}_{d_t}.txt", "w") as f:
                 f.write(f"{operator}|{actual - start}|{t_t}")
             st.success("Salvat în istoric!")
-            salveaza_sesiune("Operator1", 0, 0, []) # Reset
+            salveaza_sesiune("Operator1", 0, 0, [])
             st.rerun()
 
     with c2:
-        with st.expander("🎯 Target (Produse)", expanded=True):
+        with st.expander("🎯 Target (Produse cu oră)", expanded=True):
             for produs, val in PRODUSE_BONUS.items():
                 cols = st.columns([0.6, 0.2, 0.2])
                 cols[0].markdown(f"**{produs}**")
@@ -95,13 +91,15 @@ with tab1:
                             del s['lista'][i]; break
                     salveaza_sesiune(operator, start, actual, s['lista']); st.rerun()
                 if cols[2].button("➕", key=f"add_{produs}"):
-                    s['lista'].append({"nume": produs, "val": val})
+                    ora = datetime.now().strftime("%H:%M")
+                    s['lista'].append({"nume": produs, "val": val, "ora": ora})
                     salveaza_sesiune(operator, start, actual, s['lista']); st.rerun()
             
             if s['lista']:
                 st.divider()
+                st.write("📋 **Istoric adăugări:**")
                 df = pd.DataFrame(s['lista'])
-                st.table(df.groupby('nume').size().reset_index(name='buc'))
+                st.table(df[['ora', 'nume', 'val']]) # Afișează ora, produsul și valoarea
                 st.write(f"### Total: {sum(i['val'] for i in s['lista']):.2f}")
                 if st.button("RESET TARGET"): salveaza_sesiune(operator, start, actual, []); st.rerun()
 

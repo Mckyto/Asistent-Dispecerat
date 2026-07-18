@@ -74,7 +74,7 @@ with tab1:
         
         if st.button("💾 Salvează și Închide Tura"):
             d_t = datetime.now().strftime("%d_%m_%Y_%H%M%S")
-            t_t = sum(i['val'] for i in s['lista'])
+            t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
             with open(f"{DATA_DIR}/raport_{operator}_{datetime.now().strftime('%d_%m_%Y')}_{d_t}.txt", "w") as f:
                 f.write(f"{operator}|{actual - start}|{t_t}")
             st.success("Salvat în istoric!")
@@ -102,7 +102,6 @@ with tab1:
                 df = pd.DataFrame(s['lista'])
                 cols_to_show = [c for c in ['ora', 'nume', 'val'] if c in df.columns]
                 st.table(df[cols_to_show])
-                # Calculăm totalul transformând string-ul în float
                 total_val = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
                 st.write(f"### Total: {total_val:.2f} lei")
                 if st.button("RESET TARGET"): salveaza_sesiune(operator, start, actual, []); st.rerun()
@@ -115,11 +114,12 @@ with tab1:
             for f_n in fisiere:
                 with open(f"{DATA_DIR}/{f_n}", "r") as f:
                     try:
+                        # Curățăm afișarea pentru a nu arăta acele cifre inutile
                         parti = f_n.replace(".txt", "").split("_")
                         data_afisata = f"{parti[2]}.{parti[3]}.{parti[4]}"
                         op, com, tgt = f.read().split('|')
                         col_a, col_b = st.columns([0.8, 0.2])
-                        col_a.write(f"📄 **{data_afisata}** | {op} | {com} com | {tgt} lei")
+                        col_a.write(f"📄 **{data_afisata}** | {op} | {com} com | {float(tgt):.2f} lei")
                         if col_b.button("❌", key=f"del_{f_n}"): os.remove(f"{DATA_DIR}/{f_n}"); st.rerun()
                         total_com += int(com); total_tgt += float(tgt)
                     except: continue

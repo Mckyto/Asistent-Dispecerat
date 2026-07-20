@@ -100,6 +100,14 @@ with tab_disp:
     
     c1, c2 = st.columns([0.4, 0.6])
     with c1:
+        # --- CALCULATOR DISCOUNT READĂUGAT AICI ---
+        with st.expander("🧮 Calculator Discount", expanded=True):
+            p = st.number_input("Total (preț):", format="%.2f", key="calc_pret")
+            s_val = st.number_input("Încasat:", format="%.2f", key="calc_incasat")
+            if st.button("Calculează Discount"):
+                diferenta = p - s_val
+                st.success(f"Diferență: {diferenta:.2f} lei")
+
         if st.button("💾 Salvează și Închide Tura"):
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
             ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')

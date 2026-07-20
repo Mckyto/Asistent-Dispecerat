@@ -2,7 +2,6 @@ import streamlit as st
 import os
 import pandas as pd
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 # --- CONFIGURARE ---
 FILE_NAME = 'contacte.txt'
@@ -78,8 +77,7 @@ with tab_disp:
     with c1:
         if st.button("💾 Salvează și Închide Tura"):
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in st.session_state['lista_produse'])
-            ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
-            with open(f"{DATA_DIR}/raport_{operator}_{ora_ro}.txt", "w") as f:
+            with open(f"{DATA_DIR}/raport_{operator}_{datetime.now().strftime('%d_%m_%Y_%H%M%S')}.txt", "w") as f:
                 f.write(f"{operator}|{actual - start}|{t_t}")
             st.success("Salvat!")
             st.session_state['lista_produse'] = []
@@ -96,7 +94,7 @@ with tab_disp:
                             del st.session_state['lista_produse'][i]; break
                     st.rerun()
                 if cols[2].button("➕", key=f"add_{produs}"):
-                    ora = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H:%M")
+                    ora = datetime.now().strftime("%H:%M")
                     st.session_state['lista_produse'].append({"nume": produs, "val": float(val), "ora": ora})
                     st.rerun()
             

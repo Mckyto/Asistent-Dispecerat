@@ -61,13 +61,13 @@ PRODUSE_BONUS = {
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
 
-# --- GESTIONARE STATE (Starea se reține complet în st.session_state) ---
+# --- GESTIONARE STATE ---
 if 's_data' not in st.session_state:
     st.session_state['s_data'] = incarca_sesiune()
 
 s = st.session_state['s_data']
 
-# --- TAB-URI (Gestionare Livratori primul) ---
+# --- TAB-URI ---
 tab_livr, tab_disp = st.tabs(["🛵 Gestionare Livratori", "⚙️ Dispecerat & Target"])
 
 with tab_livr:
@@ -97,7 +97,6 @@ with tab_disp:
     start = col_st.number_input("Start:", value=s['start'], step=1)
     actual = col_ac.number_input("Act:", value=s['actual'], step=1)
     
-    # Actualizare state și salvare în fișier la orice modificare
     if start != s['start'] or actual != s['actual']:
         s['start'] = start
         s['actual'] = actual
@@ -107,7 +106,6 @@ with tab_disp:
     
     c1, c2 = st.columns([0.4, 0.6])
     with c1:
-        # --- CALCULATOR DISCOUNT ---
         with st.expander("🧮 Calculator Discount", expanded=True):
             p = st.number_input("Total (preț):", format="%.2f", key="calc_pret")
             s_val = st.number_input("Încasat:", format="%.2f", key="calc_incasat")
@@ -125,8 +123,7 @@ with tab_disp:
             st.session_state['s_data'] = incarca_sesiune()
             st.rerun()
 
-        # --- GENERARE RAPORT MANUAL (DUPĂ CERINȚĂ) ---
-        with st.expander("📝 Generează Raport Rapid (859 com / 303.70 lei)", expanded=True):
+        with st.expander("📝 Generează Raport Rapid", expanded=True):
             if st.button("Salvează Raportul cu 859 comenzi și 303.70 lei"):
                 ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
                 with open(f"{DATA_DIR}/raport_{OPERATOR_NUME}_{ora_ro}.txt", "w") as f:

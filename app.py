@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 FILE_NAME = 'contacte.txt'
 DATA_DIR = "rapoarte_zilnice"
 STATE_FILE = "sesiune_persistenta.json"
-OPERATOR_NUME = "Operator"  # Nume unic prestabilit, nefiind nevoie de câmp editabil
+OPERATOR_NUME = "Operator"
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(FILE_NAME): open(FILE_NAME, "w").close()
 
@@ -23,7 +23,6 @@ def incarca_sesiune():
         try:
             with open(STATE_FILE, "r") as f: 
                 data = json.load(f)
-                # Asigură compatibilitatea dacă fișierul vechi conținea cheia 'op'
                 return {"start": data.get("start", 0), "actual": data.get("actual", 0), "lista": data.get("lista", [])}
         except: pass
     return {"start": 0, "actual": 0, "lista": []}

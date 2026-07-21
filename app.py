@@ -9,20 +9,24 @@ from zoneinfo import ZoneInfo
 FILE_NAME = 'contacte.txt'
 DATA_DIR = "rapoarte_zilnice"
 STATE_FILE = "sesiune_persistenta.json"
+OPERATOR_NUME = "Operator"  # Nume unic prestabilit, nefiind nevoie de câmp editabil
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(FILE_NAME): open(FILE_NAME, "w").close()
 
 # --- FUNCȚII PERSISTENȚĂ SESIUNE ---
-def salveaza_sesiune(op, start, actual, lista):
+def salveaza_sesiune(start, actual, lista):
     with open(STATE_FILE, "w") as f:
-        json.dump({"op": op, "start": start, "actual": actual, "lista": lista}, f)
+        json.dump({"start": start, "actual": actual, "lista": lista}, f)
 
 def incarca_sesiune():
     if os.path.exists(STATE_FILE):
         try:
-            with open(STATE_FILE, "r") as f: return json.load(f)
+            with open(STATE_FILE, "r") as f: 
+                data = json.load(f)
+                # Asigură compatibilitatea dacă fișierul vechi conținea cheia 'op'
+                return {"start": data.get("start", 0), "actual": data.get("actual", 0), "lista": data.get("lista", [])}
         except: pass
-    return {"op": "Operator1", "start": 0, "actual": 0, "lista": []}
+    return {"start": 0, "actual": 0, "lista": []}
 
 # --- FUNCȚII LIVRATORI ---
 def incarca_livratori():
@@ -90,23 +94,21 @@ with tab_livr:
                         st.rerun()
 
 with tab_disp:
-    col_op, col_st, col_ac = st.columns(3)
-    operator = col_op.text_input("👤 Operator:", value=s['op'])
+    col_st, col_ac = st.columns(2)
     start = col_st.number_input("Start:", value=s['start'], step=1)
     actual = col_ac.number_input("Act:", value=s['actual'], step=1)
     
     # Actualizare state și salvare în fișier la orice modificare
-    if operator != s['op'] or start != s['start'] or actual != s['actual']:
-        s['op'] = operator
+    if start != s['start'] or actual != s['actual']:
         s['start'] = start
         s['actual'] = actual
-        salveaza_sesiune(s['op'], s['start'], s['actual'], s['lista'])
+        salveaza_sesiune(s['start'], s['actual'], s['lista'])
     
     st.info(f"✅ {actual - start} comenzi în total.")
     
     c1, c2 = st.columns([0.4, 0.6])
     with c1:
-        # --- CALCULATOR DISCOUNT READĂUGAT AICI ---
+        # --- CALCULATOR DISCOUNT ---
         with st.expander("🧮 Calculator Discount", expanded=True):
             p = st.number_input("Total (preț):", format="%.2f", key="calc_pret")
             s_val = st.number_input("Încasat:", format="%.2f", key="calc_incasat")
@@ -117,10 +119,10 @@ with tab_disp:
         if st.button("💾 Salvează și Închide Tura"):
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
             ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
-            with open(f"{DATA_DIR}/raport_{operator}_{ora_ro}.txt", "w") as f:
-                f.write(f"{operator}|{actual - start}|{t_t}")
+            with open(f"{DATA_DIR}/raport_{OPERATOR_NUME}_{ora_ro}.txt", "w") as f:
+                f.write(f"{OPERATOR_NUME}|{actual - start}|{t_t}")
             st.success("Salvat!")
-            salveaza_sesiune("Operator1", 0, 0, [])
+            salveaza_sesiune(0, 0, [])
             st.session_state['s_data'] = incarca_sesiune()
             st.rerun()
 
@@ -133,12 +135,12 @@ with tab_disp:
                     for i in reversed(range(len(s['lista']))):
                         if s['lista'][i]['nume'] == produs:
                             del s['lista'][i]; break
-                    salveaza_sesiune(s['op'], s['start'], s['actual'], s['lista'])
+                    salveaza_sesiune(s['start'], s['actual'], s['lista'])
                     st.rerun()
                 if cols[2].button("➕", key=f"add_{produs}"):
                     ora = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H:%M")
                     s['lista'].append({"nume": produs, "val": float(val), "ora": ora})
-                    salveaza_sesiune(s['op'], s['start'], s['actual'], s['lista'])
+                    salveaza_sesiune(s['start'], s['actual'], s['lista'])
                     st.rerun()
             
             if s['lista']:
@@ -152,7 +154,7 @@ with tab_disp:
                     st.table(df_viz[cols_to_use])
                 st.write(f"### Total: {sum(float(i['val']) for i in s['lista']):.2f} lei")
                 if st.button("RESET TARGET"): 
-                    salveaza_sesiune(s['op'], s['start'], s['actual'], [])
+                    salveaza_sesiune(s['start'], s['actual'], [])
                     s['lista'] = []
                     st.rerun()
 
@@ -166,7 +168,7 @@ with tab_disp:
                     parti = f_n.split('_')
                     data_afis = f"{parti[2]}.{parti[3]}.{parti[4]}"
                     col_a, col_b = st.columns([0.8, 0.2])
-                    col_a.write(f"📄 **{data_afis}** | {op} | {com} com | {float(tgt):.2f} lei")
+                    col_a.write(f"📄 **{data_afis}** | {com} com | {float(tgt):.2f} lei")
                     if col_b.button("❌", key=f"del_{f_n}"): os.remove(f"{DATA_DIR}/{f_n}"); st.rerun()
                     total_com += int(com); total_tgt += float(tgt)
                 except: continue

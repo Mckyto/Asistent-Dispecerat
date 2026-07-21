@@ -58,8 +58,11 @@ PRODUSE_BONUS = {
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
 
-# Încărcare sesiune persistentă curentă
-s = incarca_sesiune()
+# --- GESTIONARE STATE (Starea se reține complet în st.session_state) ---
+if 's_data' not in st.session_state:
+    st.session_state['s_data'] = incarca_sesiune()
+
+s = st.session_state['s_data']
 
 # --- TAB-URI (Gestionare Livratori primul) ---
 tab_livr, tab_disp = st.tabs(["🛵 Gestionare Livratori", "⚙️ Dispecerat & Target"])
@@ -89,12 +92,15 @@ with tab_livr:
 with tab_disp:
     col_op, col_st, col_ac = st.columns(3)
     operator = col_op.text_input("👤 Operator:", value=s['op'])
-    start = col_st.number_input("Start:", value=s['start'])
-    actual = col_ac.number_input("Act:", value=s['actual'])
+    start = col_st.number_input("Start:", value=s['start'], step=1)
+    actual = col_ac.number_input("Act:", value=s['actual'], step=1)
     
-    # Salvare automată în fișierul de sesiune la orice modificare
+    # Actualizare state și salvare în fișier la orice modificare
     if operator != s['op'] or start != s['start'] or actual != s['actual']:
-        salveaza_sesiune(operator, start, actual, s['lista'])
+        s['op'] = operator
+        s['start'] = start
+        s['actual'] = actual
+        salveaza_sesiune(s['op'], s['start'], s['actual'], s['lista'])
     
     st.info(f"✅ {actual - start} comenzi în total.")
     
@@ -115,6 +121,7 @@ with tab_disp:
                 f.write(f"{operator}|{actual - start}|{t_t}")
             st.success("Salvat!")
             salveaza_sesiune("Operator1", 0, 0, [])
+            st.session_state['s_data'] = incarca_sesiune()
             st.rerun()
 
     with c2:
@@ -126,12 +133,12 @@ with tab_disp:
                     for i in reversed(range(len(s['lista']))):
                         if s['lista'][i]['nume'] == produs:
                             del s['lista'][i]; break
-                    salveaza_sesiune(operator, start, actual, s['lista'])
+                    salveaza_sesiune(s['op'], s['start'], s['actual'], s['lista'])
                     st.rerun()
                 if cols[2].button("➕", key=f"add_{produs}"):
                     ora = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H:%M")
                     s['lista'].append({"nume": produs, "val": float(val), "ora": ora})
-                    salveaza_sesiune(operator, start, actual, s['lista'])
+                    salveaza_sesiune(s['op'], s['start'], s['actual'], s['lista'])
                     st.rerun()
             
             if s['lista']:
@@ -145,7 +152,8 @@ with tab_disp:
                     st.table(df_viz[cols_to_use])
                 st.write(f"### Total: {sum(float(i['val']) for i in s['lista']):.2f} lei")
                 if st.button("RESET TARGET"): 
-                    salveaza_sesiune(operator, start, actual, [])
+                    salveaza_sesiune(s['op'], s['start'], s['actual'], [])
+                    s['lista'] = []
                     st.rerun()
 
     with st.expander("📊 Centralizator Ture"):

@@ -160,17 +160,8 @@ with tab_disp:
             st.session_state['s_data'] = incarca_sesiune()
             st.rerun()
 
-        with st.expander("📝 Generează Raport Rapid (859 com / 303.70 lei)", expanded=True):
-            if st.button("Salvează Raportul cu 859 comenzi și 303.70 lei"):
-                ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
-                with open(f"{DATA_DIR}/raport_{OPERATOR_NUME}_{ora_ro}.txt", "w") as f:
-                    f.write(f"{OPERATOR_NUME}|859|303.70")
-                st.success("Raportul cu 859 comenzi și 303.70 lei a fost generat!")
-                st.rerun()
-
     with c2:
         with st.expander("🎯 Target (Toate Produsele Active)", expanded=True):
-            # Iterăm prin TOATE produsele din dicționarul din sesiune
             for produs, val in st.session_state['produse_bonus'].items():
                 cols = st.columns([0.6, 0.2, 0.2])
                 cols[0].markdown(f"**{produs}** `({val} lei)`")

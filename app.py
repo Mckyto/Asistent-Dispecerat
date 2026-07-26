@@ -127,7 +127,7 @@ with tab_livr:
                         st.rerun()
 
 # ==========================================
-# 2. TAB DISPECERAT & TARGET
+# 2. TAB DISPECERAT & TARGET (Toate produsele incluse)
 # ==========================================
 with tab_disp:
     col_st, col_ac = st.columns(2)
@@ -169,10 +169,11 @@ with tab_disp:
                 st.rerun()
 
     with c2:
-        with st.expander("🎯 Target (Produse cu oră)", expanded=True):
+        with st.expander("🎯 Target (Toate Produsele Active)", expanded=True):
+            # Iterăm prin TOATE produsele din dicționarul din sesiune
             for produs, val in st.session_state['produse_bonus'].items():
                 cols = st.columns([0.6, 0.2, 0.2])
-                cols[0].markdown(f"**{produs}**")
+                cols[0].markdown(f"**{produs}** `({val} lei)`")
                 if cols[1].button("➖", key=f"sub_{produs}"):
                     for i in reversed(range(len(s['lista']))):
                         if s['lista'][i]['nume'] == produs:
@@ -252,18 +253,15 @@ with tab_centr:
         
         for rand in date_rapoarte:
             with st.container(border=True):
-                c_ info, c_ed, c_del = st.columns([0.6, 0.2, 0.2])
+                c_info, c_ed, c_del = st.columns([0.6, 0.2, 0.2])
                 c_info.write(f"📄 **{rand['Data']}** | {rand['Comenzi']} com | {rand['Target']:.2f} lei")
                 
-                # Buton pentru deschiderea zonei de editare a rândului
                 editeaza_apasat = c_ed.button("✏️ Editează", key=f"edit_btn_{rand['Fișier']}")
                 
-                # Buton ștergere
                 if c_del.button("❌ Șterge", key=f"del_{rand['Fișier']}"): 
                     os.remove(f"{DATA_DIR}/{rand['Fișier']}")
                     st.rerun()
                 
-                # Dacă utilizatorul a apăsat "Editează", afișăm casete de input direct sub rând
                 if editeaza_apasat:
                     st.session_state[f"is_editing_{rand['Fișier']}"] = True
                 
@@ -275,7 +273,6 @@ with tab_centr:
                         
                         col_salveaza, col_anuleaza = st.columns(2)
                         if col_salveaza.form_submit_button("Salvează Modificările"):
-                            # Scriem înapoi în fișierul text original
                             with open(f"{DATA_DIR}/{rand['Fișier']}", "w") as f_out:
                                 f_out.write(f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}")
                             st.session_state[f"is_editing_{rand['Fișier']}"] = False

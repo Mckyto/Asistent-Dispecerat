@@ -11,6 +11,7 @@ DATA_DIR = "rapoarte_zilnice"
 STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
+PAROLA_DISPECERAT = "presto2026"  # Poți schimba parola de aici
 
 if not os.path.exists(DATA_DIR): 
     os.makedirs(DATA_DIR)
@@ -89,6 +90,8 @@ if 's_data' not in st.session_state:
     st.session_state['s_data'] = incarca_sesiune()
 if 'produse_bonus' not in st.session_state:
     st.session_state['produse_bonus'] = incarca_produse()
+if 'autentificat_disp' not in st.session_state:
+    st.session_state['autentificat_disp'] = False
 
 s = st.session_state['s_data']
 
@@ -126,67 +129,83 @@ with tab_livr:
                         st.rerun()
 
 # ==========================================
-# 2. TAB DISPECERAT & TARGET
+# 2. TAB DISPECERAT & TARGET (Protejat cu parolă)
 # ==========================================
 with tab_disp:
-    actual = st.number_input("Număr comenzi actual:", value=s['actual'], step=1)
-    
-    if actual != s['actual']:
-        s['actual'] = actual
-        salveaza_sesiune(s['actual'], s['lista'])
-    
-    st.info(f"✅ {actual} comenzi în total.")
-    
-    c1, c2 = st.columns([0.4, 0.6])
-    with c1:
-        with st.expander("🧮 Calculator Discount", expanded=True):
-            p = st.number_input("Total (preț):", format="%.2f", key="calc_pret")
-            s_val = st.number_input("Încasat:", format="%.2f", key="calc_incasat")
-            if st.button("Calculează Discount"):
-                diferenta = p - s_val
-                st.success(f"Diferență: {diferenta:.2f} lei")
-
-        if st.button("💾 Salvează și Închide Tura"):
-            t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
-            ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
-            with open(f"{DATA_DIR}/raport_{OPERATOR_NUME}_{ora_ro}.txt", "w") as f:
-                f.write(f"{OPERATOR_NUME}|{actual}|{t_t}")
-            st.success("Salvat!")
-            salveaza_sesiune(0, [])
-            st.session_state['s_data'] = incarca_sesiune()
+    if not st.session_state['autentificat_disp']:
+        st.subheader("🔐 Acces Protejat")
+        parola_intrata = st.text_input("Introdu parola pentru Dispecerat & Target:", type="password")
+        if st.button("Autentificare"):
+            if parola_intrata == PAROLA_DISPECERAT:
+                st.session_state['autentificat_disp'] = True
+                st.success("Acces permis!")
+                st.rerun()
+            else:
+                st.error("Parolă incorectă!")
+    else:
+        if st.button("🔒 Deconectare"):
+            st.session_state['autentificat_disp'] = False
             st.rerun()
-
-    with c2:
-        with st.expander("🎯 Target (Toate Produsele Active)", expanded=True):
-            for produs, val in st.session_state['produse_bonus'].items():
-                cols = st.columns([0.6, 0.2, 0.2])
-                cols[0].markdown(f"**{produs}** `({val} lei)`")
-                if cols[1].button("➖", key=f"sub_{produs}"):
-                    for i in reversed(range(len(s['lista']))):
-                        if s['lista'][i]['nume'] == produs:
-                            del s['lista'][i]; break
-                    salveaza_sesiune(s['actual'], s['lista'])
-                    st.rerun()
-                if cols[2].button("➕", key=f"add_{produs}"):
-                    ora = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H:%M")
-                    s['lista'].append({"nume": produs, "val": float(val), "ora": ora})
-                    salveaza_sesiune(s['actual'], s['lista'])
-                    st.rerun()
             
-            if s['lista']:
-                st.divider()
-                st.write("📋 **Istoric adăugări:**")
-                df = pd.DataFrame(s['lista'])
-                cols_to_use = ['ora', 'nume', 'val']
-                if all(col in df.columns for col in cols_to_use):
-                    df_viz = df.copy()
-                    df_viz['val'] = df_viz['val'].apply(lambda x: f"{float(x):.2f} lei")
-                    st.table(df_viz[cols_to_use])
-                st.write(f"### Total: {sum(float(i['val']) for i in s['lista']):.2f} lei")
-                if st.button("RESET TARGET"): 
-                    salveaza_sesiune(s['actual'], [])
-                    s['lista'] = []
-                    st.rerun()
+        st.divider()
+        actual = st.number_input("Număr comenzi actual:", value=s['actual'], step=1)
+        
+        if actual != s['actual']:
+            s['actual'] = actual
+            salveaza_sesiune(s['actual'], s['lista'])
+        
+        st.info(f"✅ {actual} comenzi în total.")
+        
+        c1, c2 = st.columns([0.4, 0.6])
+        with c1:
+            with st.expander("🧮 Calculator Discount", expanded=True):
+                p = st.number_input("Total (preț):", format="%.2f", key="calc_pret")
+                s_val = st.number_input("Încasat:", format="%.2f", key="calc_incasat")
+                if st.button("Calculează Discount"):
+                    diferenta = p - s_val
+                    st.success(f"Diferență: {diferenta:.2f} lei")
+
+            if st.button("💾 Salvează și Închide Tura"):
+                t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
+                ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
+                with open(f"{DATA_DIR}/raport_{OPERATOR_NUME}_{ora_ro}.txt", "w") as f:
+                    f.write(f"{OPERATOR_NUME}|{actual}|{t_t}")
+                st.success("Salvat!")
+                salveaza_sesiune(0, [])
+                st.session_state['s_data'] = incarca_sesiune()
+                st.rerun()
+
+        with c2:
+            with st.expander("🎯 Target (Toate Produsele Active)", expanded=True):
+                for produs, val in st.session_state['produse_bonus'].items():
+                    cols = st.columns([0.6, 0.2, 0.2])
+                    cols[0].markdown(f"**{produs}** `({val} lei)`")
+                    if cols[1].button("➖", key=f"sub_{produs}"):
+                        for i in reversed(range(len(s['lista']))):
+                            if s['lista'][i]['nume'] == produs:
+                                del s['lista'][i]; break
+                        salveaza_sesiune(s['actual'], s['lista'])
+                        st.rerun()
+                    if cols[2].button("➕", key=f"add_{produs}"):
+                        ora = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H:%M")
+                        s['lista'].append({"nume": produs, "val": float(val), "ora": ora})
+                        salveaza_sesiune(s['actual'], s['lista'])
+                        st.rerun()
+                
+                if s['lista']:
+                    st.divider()
+                    st.write("📋 **Istoric adăugări:**")
+                    df = pd.DataFrame(s['lista'])
+                    cols_to_use = ['ora', 'nume', 'val']
+                    if all(col in df.columns for col in cols_to_use):
+                        df_viz = df.copy()
+                        df_viz['val'] = df_viz['val'].apply(lambda x: f"{float(x):.2f} lei")
+                        st.table(df_viz[cols_to_use])
+                    st.write(f"### Total: {sum(float(i['val']) for i in s['lista']):.2f} lei")
+                    if st.button("RESET TARGET"): 
+                        salveaza_sesiune(s['actual'], [])
+                        s['lista'] = []
+                        st.rerun()
 
 # ==========================================
 # 3. TAB CENTRALIZATOR & EDITARE RAPOARTE

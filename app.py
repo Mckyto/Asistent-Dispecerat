@@ -50,7 +50,7 @@ def incarca_produse():
     "Pui ZAO": 1.0, "Mix de fructe prajit/in caramel": 1.0, "Lapte prajit": 1.0, 
     "Pui sichuan": 1.0, "Wings bucket": 2.0, "Apa BAX": 2.0
 }
-    }
+    
     with open(PRODUSE_FILE, "w") as f:
         json.dump(produse_default, f)
     return produse_default

@@ -18,9 +18,9 @@ if not os.path.exists(FILE_NAME):
     open(FILE_NAME, "w").close()
 
 # --- FUNCȚII PERSISTENȚĂ SESIUNE ---
-def salveaza_sesiune(start, actual, lista):
+def salveaza_sesiune(actual, lista):
     with open(STATE_FILE, "w") as f:
-        json.dump({"start": start, "actual": actual, "lista": lista}, f)
+        json.dump({"actual": actual, "lista": lista}, f)
 
 def incarca_sesiune():
     if os.path.exists(STATE_FILE):
@@ -28,12 +28,11 @@ def incarca_sesiune():
             with open(STATE_FILE, "r") as f: 
                 data = json.load(f)
                 return {
-                    "start": data.get("start", 0), 
                     "actual": data.get("actual", 0), 
                     "lista": data.get("lista", [])
                 }
         except: pass
-    return {"start": 0, "actual": 0, "lista": []}
+    return {"actual": 0, "lista": []}
 
 # --- FUNCȚII GESTIONARE PRODUSE ---
 def incarca_produse():
@@ -130,16 +129,13 @@ with tab_livr:
 # 2. TAB DISPECERAT & TARGET
 # ==========================================
 with tab_disp:
-    col_st, col_ac = st.columns(2)
-    start = col_st.number_input("Start:", value=s['start'], step=1)
-    actual = col_ac.number_input("Act:", value=s['actual'], step=1)
+    actual = st.number_input("Număr comenzi actual:", value=s['actual'], step=1)
     
-    if start != s['start'] or actual != s['actual']:
-        s['start'] = start
+    if actual != s['actual']:
         s['actual'] = actual
-        salveaza_sesiune(s['start'], s['actual'], s['lista'])
+        salveaza_sesiune(s['actual'], s['lista'])
     
-    st.info(f"✅ {actual - start} comenzi în total.")
+    st.info(f"✅ {actual} comenzi în total.")
     
     c1, c2 = st.columns([0.4, 0.6])
     with c1:
@@ -154,9 +150,9 @@ with tab_disp:
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
             ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
             with open(f"{DATA_DIR}/raport_{OPERATOR_NUME}_{ora_ro}.txt", "w") as f:
-                f.write(f"{OPERATOR_NUME}|{actual - start}|{t_t}")
+                f.write(f"{OPERATOR_NUME}|{actual}|{t_t}")
             st.success("Salvat!")
-            salveaza_sesiune(0, 0, [])
+            salveaza_sesiune(0, [])
             st.session_state['s_data'] = incarca_sesiune()
             st.rerun()
 
@@ -169,12 +165,12 @@ with tab_disp:
                     for i in reversed(range(len(s['lista']))):
                         if s['lista'][i]['nume'] == produs:
                             del s['lista'][i]; break
-                    salveaza_sesiune(s['start'], s['actual'], s['lista'])
+                    salveaza_sesiune(s['actual'], s['lista'])
                     st.rerun()
                 if cols[2].button("➕", key=f"add_{produs}"):
                     ora = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H:%M")
                     s['lista'].append({"nume": produs, "val": float(val), "ora": ora})
-                    salveaza_sesiune(s['start'], s['actual'], s['lista'])
+                    salveaza_sesiune(s['actual'], s['lista'])
                     st.rerun()
             
             if s['lista']:
@@ -188,7 +184,7 @@ with tab_disp:
                     st.table(df_viz[cols_to_use])
                 st.write(f"### Total: {sum(float(i['val']) for i in s['lista']):.2f} lei")
                 if st.button("RESET TARGET"): 
-                    salveaza_sesiune(s['start'], s['actual'], [])
+                    salveaza_sesiune(s['actual'], [])
                     s['lista'] = []
                     st.rerun()
 
@@ -206,7 +202,6 @@ with tab_centr:
             try:
                 op, com, tgt = f.read().split('|')
                 parti = f_n.split('_')
-                # Nume fișier: raport_Operator_ZZ_LL_AAAA_HHMMSS.txt
                 zi, luna, an = parti[2], parti[3], parti[4]
                 data_afis = f"{zi}.{luna}.{an}" 
                 
@@ -264,7 +259,6 @@ with tab_centr:
                     with st.form(key=f"form_edit_{rand['Fișier']}"):
                         st.write(f"Modificare raport: {rand['Fișier']}")
                         
-                        # Input pentru data nouă
                         data_curenta_obj = datetime.strptime(rand['Data'], "%d.%m.%Y")
                         noua_data = st.date_input("Data raportului:", value=data_curenta_obj)
                         
@@ -273,23 +267,19 @@ with tab_centr:
                         
                         col_salveaza, col_anuleaza = st.columns(2)
                         if col_salveaza.form_submit_button("Salvează Modificările"):
-                            # Extragem noua zi, lună, an
                             n_zi = noua_data.strftime("%d")
                             n_luna = noua_data.strftime("%m")
                             n_an = noua_data.strftime("%Y")
                             
-                            # Păstrăm ora veche din numele fișierului existent
                             parti_vechi = rand['Fișier'].split('_')
                             ora_veche = parti_vechi[5] if len(parti_vechi) > 5 else "000000.txt"
                             
                             nume_nou_fisier = f"raport_{OPERATOR_NUME}_{n_zi}_{n_luna}_{n_an}_{ora_veche}"
                             
-                            # Ștergem fișierul vechi dacă s-a schimbat numele
                             if rand['Fișier'] != nume_nou_fisier:
                                 if os.path.exists(f"{DATA_DIR}/{rand['Fișier']}"):
                                     os.remove(f"{DATA_DIR}/{rand['Fișier']}")
                             
-                            # Scriem noul fișier
                             with open(f"{DATA_DIR}/{nume_nou_fisier}", "w") as f_out:
                                 f_out.write(f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}")
                                 

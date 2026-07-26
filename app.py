@@ -127,7 +127,7 @@ with tab_livr:
                         st.rerun()
 
 # ==========================================
-# 2. TAB DISPECERAT & TARGET (Toate produsele incluse)
+# 2. TAB DISPECERAT & TARGET
 # ==========================================
 with tab_disp:
     col_st, col_ac = st.columns(2)
@@ -206,9 +206,13 @@ with tab_centr:
             try:
                 op, com, tgt = f.read().split('|')
                 parti = f_n.split('_')
-                data_afis = f"{parti[2]}.{parti[3]}.{parti[4]}" 
+                # Nume fișier: raport_Operator_ZZ_LL_AAAA_HHMMSS.txt
+                zi, luna, an = parti[2], parti[3], parti[4]
+                data_afis = f"{zi}.{luna}.{an}" 
+                
                 date_rapoarte.append({
                     "Fișier": f_n, "Data": data_afis, 
+                    "Zi": zi, "Luna": luna, "An": an,
                     "Comenzi": int(com), "Target": float(tgt)
                 })
                 total_com += int(com)
@@ -240,7 +244,7 @@ with tab_centr:
         st.bar_chart(df_grafic, x="Data", y="Comenzi", color="#ff4b4b")
         
         st.divider()
-        st.write("📋 **Istoric Detaliat Ture (Editează / Șterge)**")
+        st.write("📋 **Istoric Detaliat Ture (Editează Data / Comenzi / Target sau Șterge)**")
         
         for rand in date_rapoarte:
             with st.container(border=True):
@@ -259,16 +263,40 @@ with tab_centr:
                 if st.session_state.get(f"is_editing_{rand['Fișier']}", False):
                     with st.form(key=f"form_edit_{rand['Fișier']}"):
                         st.write(f"Modificare raport: {rand['Fișier']}")
+                        
+                        # Input pentru data nouă
+                        data_curenta_obj = datetime.strptime(rand['Data'], "%d.%m.%Y")
+                        noua_data = st.date_input("Data raportului:", value=data_curenta_obj)
+                        
                         nou_com = st.number_input("Comenzi:", value=rand['Comenzi'], step=1)
                         nou_tgt = st.number_input("Target (lei):", value=rand['Target'], format="%.2f", step=0.1)
                         
                         col_salveaza, col_anuleaza = st.columns(2)
                         if col_salveaza.form_submit_button("Salvează Modificările"):
-                            with open(f"{DATA_DIR}/{rand['Fișier']}", "w") as f_out:
+                            # Extragem noua zi, lună, an
+                            n_zi = noua_data.strftime("%d")
+                            n_luna = noua_data.strftime("%m")
+                            n_an = noua_data.strftime("%Y")
+                            
+                            # Păstrăm ora veche din numele fișierului existent
+                            parti_vechi = rand['Fișier'].split('_')
+                            ora_veche = parti_vechi[5] if len(parti_vechi) > 5 else "000000.txt"
+                            
+                            nume_nou_fisier = f"raport_{OPERATOR_NUME}_{n_zi}_{n_luna}_{n_an}_{ora_veche}"
+                            
+                            # Ștergem fișierul vechi dacă s-a schimbat numele
+                            if rand['Fișier'] != nume_nou_fisier:
+                                if os.path.exists(f"{DATA_DIR}/{rand['Fișier']}"):
+                                    os.remove(f"{DATA_DIR}/{rand['Fișier']}")
+                            
+                            # Scriem noul fișier
+                            with open(f"{DATA_DIR}/{nume_nou_fisier}", "w") as f_out:
                                 f_out.write(f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}")
+                                
                             st.session_state[f"is_editing_{rand['Fișier']}"] = False
                             st.success("Modificat cu succes!")
                             st.rerun()
+                            
                         if col_anuleaza.form_submit_button("Anulează"):
                             st.session_state[f"is_editing_{rand['Fișier']}"] = False
                             st.rerun()

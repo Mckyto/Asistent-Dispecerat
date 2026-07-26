@@ -43,7 +43,6 @@ def incarca_produse():
                 return json.load(f)
         except: pass
     
-    # Produsele preluate exact din tabelul original
     produse_default = {
         "Baclava": 1.0, "Tiramisu": 1.0, "Cheesecake": 1.0, "Kataif": 1.0, 
         "Placinta cu iaurt": 1.0, "Salam de biscuiti": 1.0, "Gogosi": 1.0, 
@@ -202,11 +201,11 @@ with tab_disp:
                     st.rerun()
 
 # ==========================================
-# 3. TAB CENTRALIZATOR & EDITARE TOTALURI
+# 3. TAB CENTRALIZATOR & EDITARE RAPOARTE
 # ==========================================
 with tab_centr:
     st.subheader("📊 Analiză și Istoric Ture")
-    total_com_calc, total_tgt_calc = 0, 0
+    total_com, total_tgt = 0, 0
     date_rapoarte = []
     
     for f_n in sorted(os.listdir(DATA_DIR)):
@@ -220,20 +219,18 @@ with tab_centr:
                     "Fișier": f_n, "Data": data_afis, 
                     "Comenzi": int(com), "Target": float(tgt)
                 })
-                total_com_calc += int(com)
-                total_tgt_calc += float(tgt)
+                total_com += int(com)
+                total_tgt += float(tgt)
             except: continue
 
-    # Totaluri editabile manual de dispecer
     col_m1, col_m2 = st.columns(2)
-    total_com = col_m1.number_input("Total Comenzi (Editabil):", value=int(total_com_calc), step=1, key="edit_total_com")
-    total_tgt = col_m2.number_input("Total Target (Editabil - lei):", value=float(total_tgt_calc), format="%.2f", step=1.0, key="edit_total_tgt")
+    col_m1.metric("Total Comenzi", total_com)
+    col_m2.metric("Total Target", f"{total_tgt:.2f} lei")
     
     if date_rapoarte:
         st.divider()
         df_rapoarte = pd.DataFrame(date_rapoarte)
         
-        # Generare fișier CSV pentru export
         df_export = df_rapoarte[['Data', 'Comenzi', 'Target']].copy()
         csv_data = df_export.to_csv(index=False).encode('utf-8')
         
@@ -251,14 +248,42 @@ with tab_centr:
         st.bar_chart(df_grafic, x="Data", y="Comenzi", color="#ff4b4b")
         
         st.divider()
-        st.write("📋 **Istoric Detaliat Ture**")
+        st.write("📋 **Istoric Detaliat Ture (Editează / Șterge)**")
+        
         for rand in date_rapoarte:
-            col_a, col_b = st.columns([0.8, 0.2])
-            col_a.write(f"📄 **{rand['Data']}** | {rand['Comenzi']} com | {rand['Target']:.2f} lei")
-            
-            if col_b.button("❌", key=f"del_{rand['Fișier']}"): 
-                os.remove(f"{DATA_DIR}/{rand['Fișier']}")
-                st.rerun()
+            with st.container(border=True):
+                c_ info, c_ed, c_del = st.columns([0.6, 0.2, 0.2])
+                c_info.write(f"📄 **{rand['Data']}** | {rand['Comenzi']} com | {rand['Target']:.2f} lei")
+                
+                # Buton pentru deschiderea zonei de editare a rândului
+                editeaza_apasat = c_ed.button("✏️ Editează", key=f"edit_btn_{rand['Fișier']}")
+                
+                # Buton ștergere
+                if c_del.button("❌ Șterge", key=f"del_{rand['Fișier']}"): 
+                    os.remove(f"{DATA_DIR}/{rand['Fișier']}")
+                    st.rerun()
+                
+                # Dacă utilizatorul a apăsat "Editează", afișăm casete de input direct sub rând
+                if editeaza_apasat:
+                    st.session_state[f"is_editing_{rand['Fișier']}"] = True
+                
+                if st.session_state.get(f"is_editing_{rand['Fișier']}", False):
+                    with st.form(key=f"form_edit_{rand['Fișier']}"):
+                        st.write(f"Modificare raport: {rand['Fișier']}")
+                        nou_com = st.number_input("Comenzi:", value=rand['Comenzi'], step=1)
+                        nou_tgt = st.number_input("Target (lei):", value=rand['Target'], format="%.2f", step=0.1)
+                        
+                        col_salveaza, col_anuleaza = st.columns(2)
+                        if col_salveaza.form_submit_button("Salvează Modificările"):
+                            # Scriem înapoi în fișierul text original
+                            with open(f"{DATA_DIR}/{rand['Fișier']}", "w") as f_out:
+                                f_out.write(f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}")
+                            st.session_state[f"is_editing_{rand['Fișier']}"] = False
+                            st.success("Modificat cu succes!")
+                            st.rerun()
+                        if col_anuleaza.form_submit_button("Anulează"):
+                            st.session_state[f"is_editing_{rand['Fișier']}"] = False
+                            st.rerun()
     else:
         st.info("Nu există rapoarte salvate încă. Finalizează o tură pentru a vizualiza centralizatorul.")
 

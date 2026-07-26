@@ -5,15 +5,17 @@ import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-# --- CONFIGURARE ---
+# --- CONFIGURARE FIȘIERE & FOLDERE ---
 FILE_NAME = 'contacte.txt'
 DATA_DIR = "rapoarte_zilnice"
 STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
 
-if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
-if not os.path.exists(FILE_NAME): open(FILE_NAME, "w").close()
+if not os.path.exists(DATA_DIR): 
+    os.makedirs(DATA_DIR)
+if not os.path.exists(FILE_NAME): 
+    open(FILE_NAME, "w").close()
 
 # --- FUNCȚII PERSISTENȚĂ SESIUNE ---
 def salveaza_sesiune(start, actual, lista):
@@ -25,7 +27,11 @@ def incarca_sesiune():
         try:
             with open(STATE_FILE, "r") as f: 
                 data = json.load(f)
-                return {"start": data.get("start", 0), "actual": data.get("actual", 0), "lista": data.get("lista", [])}
+                return {
+                    "start": data.get("start", 0), 
+                    "actual": data.get("actual", 0), 
+                    "lista": data.get("lista", [])
+                }
         except: pass
     return {"start": 0, "actual": 0, "lista": []}
 
@@ -37,20 +43,18 @@ def incarca_produse():
                 return json.load(f)
         except: pass
     
-    # Dacă fișierul nu există, îl creăm cu produsele de bază
-    
+    # Produsele preluate exact din tabelul original
     produse_default = {
-    "Baclava": 1.0, "Tiramisu": 1.0, "Cheesecake": 1.0, "Kataif": 1.0, 
-    "Placinta cu iaurt": 1.0, "Salam de biscuiti": 1.0, "Gogosi": 1.0, 
-    "Bucket gogosi": 1.0, "Inghetata": 1.0, "Limonada": 1.0, 
-    "Hamburger pui": 0.2, "Painica mare": 0.5, "Paste Quattro Formaggi": 1.0, 
-    "Pizza Napoletta": 1.0, "Painica napolettana": 0.5, "Pita Gyros": 1.0, 
-    "Bere Porst": 0.5, "Shaorma cu pui crispy": 0.5, "Salata de pui crispy": 0.3, 
-    "Mozzarella": 0.3, "Grana padano": 1.0, "Vita tibetana": 1.0, 
-    "Pui ZAO": 1.0, "Mix de fructe prajit/in caramel": 1.0, "Lapte prajit": 1.0, 
-    "Pui sichuan": 1.0, "Wings bucket": 2.0, "Apa BAX": 2.0
-}
-    
+        "Baclava": 1.0, "Tiramisu": 1.0, "Cheesecake": 1.0, "Kataif": 1.0, 
+        "Placinta cu iaurt": 1.0, "Salam de biscuiti": 1.0, "Gogosi": 1.0, 
+        "Bucket gogosi": 1.0, "Inghetata": 1.0, "Limonada": 1.0, 
+        "Hamburger pui": 0.2, "Painica mare": 0.5, "Paste Quattro Formaggi": 1.0, 
+        "Pizza Napoletta": 1.0, "Painica napolettana": 0.5, "Pita Gyros": 1.0, 
+        "Bere Porst": 0.5, "Shaorma cu pui crispy": 0.5, "Salata de pui crispy": 0.3, 
+        "Mozzarella": 0.3, "Grana padano": 1.0, "Vita tibetana": 1.0, 
+        "Pui ZAO": 1.0, "Mix de fructe prajit/in caramel": 1.0, "Lapte prajit": 1.0, 
+        "Pui sichuan": 1.0, "Wings bucket": 2.0, "Apa BAX": 2.0
+    }
     with open(PRODUSE_FILE, "w") as f:
         json.dump(produse_default, f)
     return produse_default
@@ -62,7 +66,8 @@ def salveaza_produse(produse_dict):
 # --- FUNCȚII LIVRATORI ---
 def incarca_livratori():
     if os.path.exists(FILE_NAME):
-        with open(FILE_NAME, "r") as f: return [l.strip() for l in f.readlines() if l.strip()]
+        with open(FILE_NAME, "r") as f: 
+            return [l.strip() for l in f.readlines() if l.strip()]
     return []
 
 def salveaza_livrator_nou(nume):
@@ -74,13 +79,14 @@ def sterge_livrator(nume_de_sters):
     if nume_de_sters in lista:
         lista.remove(nume_de_sters)
         with open(FILE_NAME, "w") as f:
-            for nume in lista: f.write(nume + "\n")
+            for nume in lista: 
+                f.write(nume + "\n")
 
-# --- INTERFAȚĂ ---
+# --- INTERFAȚĂ PRINCIPALĂ ---
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
 
-# --- GESTIONARE STATE ---
+# --- INITIALIZARE SESSION STATE ---
 if 's_data' not in st.session_state:
     st.session_state['s_data'] = incarca_sesiune()
 if 'produse_bonus' not in st.session_state:
@@ -88,7 +94,7 @@ if 'produse_bonus' not in st.session_state:
 
 s = st.session_state['s_data']
 
-# --- TAB-URI ---
+# --- ORGANIZARE TAB-URI ---
 tab_livr, tab_disp, tab_centr, tab_admin = st.tabs([
     "🛵 Gestionare Livratori", 
     "⚙️ Dispecerat & Target", 
@@ -122,7 +128,7 @@ with tab_livr:
                         st.rerun()
 
 # ==========================================
-# 2. TAB DISPECERAT
+# 2. TAB DISPECERAT & TARGET
 # ==========================================
 with tab_disp:
     col_st, col_ac = st.columns(2)
@@ -154,6 +160,14 @@ with tab_disp:
             salveaza_sesiune(0, 0, [])
             st.session_state['s_data'] = incarca_sesiune()
             st.rerun()
+
+        with st.expander("📝 Generează Raport Rapid (859 com / 303.70 lei)", expanded=True):
+            if st.button("Salvează Raportul cu 859 comenzi și 303.70 lei"):
+                ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
+                with open(f"{DATA_DIR}/raport_{OPERATOR_NUME}_{ora_ro}.txt", "w") as f:
+                    f.write(f"{OPERATOR_NUME}|859|303.70")
+                st.success("Raportul cu 859 comenzi și 303.70 lei a fost generat!")
+                st.rerun()
 
     with c2:
         with st.expander("🎯 Target (Produse cu oră)", expanded=True):
@@ -188,11 +202,11 @@ with tab_disp:
                     st.rerun()
 
 # ==========================================
-# 3. TAB CENTRALIZATOR & EXPORT
+# 3. TAB CENTRALIZATOR & EDITARE TOTALURI
 # ==========================================
 with tab_centr:
     st.subheader("📊 Analiză și Istoric Ture")
-    total_com, total_tgt = 0, 0
+    total_com_calc, total_tgt_calc = 0, 0
     date_rapoarte = []
     
     for f_n in sorted(os.listdir(DATA_DIR)):
@@ -206,18 +220,20 @@ with tab_centr:
                     "Fișier": f_n, "Data": data_afis, 
                     "Comenzi": int(com), "Target": float(tgt)
                 })
-                total_com += int(com)
-                total_tgt += float(tgt)
+                total_com_calc += int(com)
+                total_tgt_calc += float(tgt)
             except: continue
 
+    # Totaluri editabile manual de dispecer
     col_m1, col_m2 = st.columns(2)
-    col_m1.metric("Total Comenzi", total_com)
-    col_m2.metric("Total Target", f"{total_tgt:.2f} lei")
+    total_com = col_m1.number_input("Total Comenzi (Editabil):", value=int(total_com_calc), step=1, key="edit_total_com")
+    total_tgt = col_m2.number_input("Total Target (Editabil - lei):", value=float(total_tgt_calc), format="%.2f", step=1.0, key="edit_total_tgt")
     
     if date_rapoarte:
         st.divider()
         df_rapoarte = pd.DataFrame(date_rapoarte)
         
+        # Generare fișier CSV pentru export
         df_export = df_rapoarte[['Data', 'Comenzi', 'Target']].copy()
         csv_data = df_export.to_csv(index=False).encode('utf-8')
         

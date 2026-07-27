@@ -6,13 +6,16 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from github import Github
 
-# --- CONFIGURARE FIȘIERE & SECRETE HARDCODATE ---
+# --- CONFIGURARE FIȘIERE & SECRETE ---
 FILE_NAME = 'contacte.txt'
 DATA_DIR = "rapoarte_zilnice"
 STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
-PAROLA_DISPECERAT = "presto2026"
+
+# Date de autentificare în aplicație (User / Parolă)
+ADMIN_USER = "admin"
+ADMIN_PASS = "presto2026"
 
 # Datele tale de GitHub integrate direct
 GITHUB_TOKEN_VAL = "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"
@@ -105,75 +108,84 @@ def sterge_livrator(nume_de_sters):
             for nume in lista: 
                 f.write(nume + "\n")
 
-# --- INTERFAȚĂ PRINCIPALĂ ---
+# --- INTERFAȚĂ PRINCIPALĂ & AUTENTIFICARE GENERALĂ ---
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
-st.title("🍕 Asistent Dispecerat Presto")
 
-# --- INITIALIZARE SESSION STATE ---
-if 's_data' not in st.session_state:
-    st.session_state['s_data'] = incarca_sesiune()
-if 'produse_bonus' not in st.session_state:
-    st.session_state['produse_bonus'] = incarca_produse()
-if 'autentificat_disp' not in st.session_state:
-    st.session_state['autentificat_disp'] = False
+# Verificăm starea de logare la nivelul întregii aplicații
+if 'autentificat_general' not in st.session_state:
+    st.session_state['autentificat_general'] = False
 
-s = st.session_state['s_data']
-
-# --- ORGANIZARE TAB-URI ---
-tab_livr, tab_disp, tab_centr, tab_admin = st.tabs([
-    "🛵 Gestionare Livratori", 
-    "⚙️ Dispecerat & Target", 
-    "📊 Centralizator", 
-    "🛠️ Admin Produse"
-])
-
-# ==========================================
-# 1. TAB LIVRATORI
-# ==========================================
-with tab_livr:
-    with st.expander("➕ Adaugă livrator nou"):
-        n_n = st.text_input("Nume livrator:")
-        if st.button("Salvează livrator"):
-            if n_n.strip():
-                salveaza_livrator_nou(n_n.strip())
-                st.success(f"Livratorul {n_n} a fost adăugat!")
+if not st.session_state['autentificat_general']:
+    st.title("🍕 Autentificare - Asistent Dispecerat Presto")
+    st.markdown("Te rog să te loghezi pentru a accesa aplicația.")
+    
+    with st.form("formular_login"):
+        user_input = st.text_input("Utilizator:")
+        pass_input = st.text_input("Parolă:", type="password")
+        submit_login = st.form_submit_button("Autentificare")
+        
+        if submit_login:
+            if user_input == ADMIN_USER and pass_input == ADMIN_PASS:
+                st.session_state['autentificat_general'] = True
+                st.success("Autentificare reușită!")
                 st.rerun()
             else:
-                st.warning("Introdu un nume valid.")
-                
-    cautare = st.text_input("🔎 Căutare livrator:")
-    if cautare:
-        for n in incarca_livratori():
-            if cautare.lower() in n.lower():
-                with st.container(border=True):
-                    c_i, c_a = st.columns([0.7, 0.3])
-                    c_i.markdown(f"**{n.upper()}**")
-                    if c_a.button("Șterge", key=f"d_{n}"):
-                        sterge_livrator(n)
-                        st.rerun()
+                st.error("Utilizator sau parolă incorecte!")
+    st.stop-wrapper = st.stop() # Oprește rularea restului aplicației dacă nu e logat
+else:
+    # --- DACĂ ESTE LOGAT, AFIȘĂM APLICAȚIA COMPLETĂ ---
+    st.title("🍕 Asistent Dispecerat Presto")
+    
+    # Buton de deconectare în sidebar sau sus
+    if st.sidebar.button("🔒 Deconectare aplicație"):
+        st.session_state['autentificat_general'] = False
+        st.rerun()
 
-# ==========================================
-# 2. TAB DISPECERAT & TARGET (Protejat cu parolă)
-# ==========================================
-with tab_disp:
-    if not st.session_state['autentificat_disp']:
-        st.subheader("🔐 Acces Protejat")
-        parola_intrata = st.text_input("Introdu parola pentru Dispecerat & Target:", type="password")
-        if st.button("Autentificare"):
-            if parola_intrata == PAROLA_DISPECERAT:
-                st.session_state['autentificat_disp'] = True
-                st.success("Acces permis!")
-                st.rerun()
-            else:
-                st.error("Parolă incorectă!")
-    else:
-        col_deconectare, col_status = st.columns([0.8, 0.2])
-        col_status.caption("⚡ Auto-Save activat")
-        if col_deconectare.button("🔒 Deconectare"):
-            st.session_state['autentificat_disp'] = False
-            st.rerun()
-            
-        st.divider()
+    # --- INITIALIZARE SESSION STATE ---
+    if 's_data' not in st.session_state:
+        st.session_state['s_data'] = incarca_sesiune()
+    if 'produse_bonus' not in st.session_state:
+        st.session_state['produse_bonus'] = incarca_produse()
+
+    s = st.session_state['s_data']
+
+    # --- ORGANIZARE TAB-URI ---
+    tab_livr, tab_disp, tab_centr, tab_admin = st.tabs([
+        "🛵 Gestionare Livratori", 
+        "⚙️ Dispecerat & Target", 
+        "📊 Centralizator", 
+        "🛠️ Admin Produse"
+    ])
+
+    # ==========================================
+    # 1. TAB LIVRATORI
+    # ==========================================
+    with tab_livr:
+        with st.expander("➕ Adaugă livrator nou"):
+            n_n = st.text_input("Nume livrator:")
+            if st.button("Salvează livrator"):
+                if n_n.strip():
+                    salveaza_livrator_nou(n_n.strip())
+                    st.success(f"Livratorul {n_n} a fost adăugat!")
+                    st.rerun()
+                else:
+                    st.warning("Introdu un nume valid.")
+                    
+        cautare = st.text_input("🔎 Căutare livrator:")
+        if cautare:
+            for n in incarca_livratori():
+                if cautare.lower() in n.lower():
+                    with st.container(border=True):
+                        c_i, c_a = st.columns([0.7, 0.3])
+                        c_i.markdown(f"**{n.upper()}**")
+                        if c_a.button("Șterge", key=f"d_{n}"):
+                            sterge_livrator(n)
+                            st.rerun()
+
+    # ==========================================
+    # 2. TAB DISPECERAT & TARGET
+    # ==========================================
+    with tab_disp:
         col_st, col_ac = st.columns(2)
         start = col_st.number_input("Start:", value=s.get('start', 0), step=1)
         actual = col_ac.number_input("Act:", value=s.get('actual', 0), step=1)
@@ -242,145 +254,145 @@ with tab_disp:
                         s['lista'] = []
                         st.rerun()
 
-# ==========================================
-# 3. TAB CENTRALIZATOR & EDITARE RAPOARTE
-# ==========================================
-with tab_centr:
-    st.subheader("📊 Analiză și Istoric Ture")
-    total_com, total_tgt = 0, 0
-    date_rapoarte = []
-    
-    for f_n in sorted(os.listdir(DATA_DIR)):
-        if not f_n.startswith("raport_"): continue
-        with open(f"{DATA_DIR}/{f_n}", "r") as f:
-            try:
-                op, com, tgt = f.read().split('|')
-                parti = f_n.split('_')
-                zi, luna, an = parti[2], parti[3], parti[4]
-                data_afis = f"{zi}.{luna}.{an}" 
-                
-                date_rapoarte.append({
-                    "Fișier": f_n, "Data": data_afis, 
-                    "Zi": zi, "Luna": luna, "An": an,
-                    "Comenzi": int(com), "Target": float(tgt)
-                })
-                total_com += int(com)
-                total_tgt += float(tgt)
-            except: continue
+    # ==========================================
+    # 3. TAB CENTRALIZATOR & EDITARE RAPOARTE
+    # ==========================================
+    with tab_centr:
+        st.subheader("📊 Analiză și Istoric Ture")
+        total_com, total_tgt = 0, 0
+        date_rapoarte = []
+        
+        for f_n in sorted(os.listdir(DATA_DIR)):
+            if not f_n.startswith("raport_"): continue
+            with open(f"{DATA_DIR}/{f_n}", "r") as f:
+                try:
+                    op, com, tgt = f.read().split('|')
+                    parti = f_n.split('_')
+                    zi, luna, an = parti[2], parti[3], parti[4]
+                    data_afis = f"{zi}.{luna}.{an}" 
+                    
+                    date_rapoarte.append({
+                        "Fișier": f_n, "Data": data_afis, 
+                        "Zi": zi, "Luna": luna, "An": an,
+                        "Comenzi": int(com), "Target": float(tgt)
+                    })
+                    total_com += int(com)
+                    total_tgt += float(tgt)
+                except: continue
 
-    col_m1, col_m2 = st.columns(2)
-    col_m1.metric("Total Comenzi", total_com)
-    col_m2.metric("Total Target", f"{total_tgt:.2f} lei")
-    
-    if date_rapoarte:
-        st.divider()
-        df_rapoarte = pd.DataFrame(date_rapoarte)
+        col_m1, col_m2 = st.columns(2)
+        col_m1.metric("Total Comenzi", total_com)
+        col_m2.metric("Total Target", f"{total_tgt:.2f} lei")
         
-        df_export = df_rapoarte[['Data', 'Comenzi', 'Target']].copy()
-        csv_data = df_export.to_csv(index=False).encode('utf-8')
-        
-        st.download_button(
-            label="📥 Descarcă Centralizator (CSV)",
-            data=csv_data,
-            file_name="raport_comenzi_presto.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-        
-        st.divider()
-        df_grafic = df_rapoarte.groupby("Data")["Comenzi"].sum().reset_index()
-        st.write("📈 **Evoluție Comenzi Zilnice**")
-        st.bar_chart(df_grafic, x="Data", y="Comenzi", color="#ff4b4b")
-        
-        st.divider()
-        st.write("📋 **Istoric Detaliat Ture (Editează Data / Comenzi / Target sau Șterge)**")
-        
-        for rand in date_rapoarte:
-            with st.container(border=True):
-                c_info, c_ed, c_del = st.columns([0.6, 0.2, 0.2])
-                c_info.write(f"📄 **{rand['Data']}** | {rand['Comenzi']} com | {rand['Target']:.2f} lei")
-                
-                editeaza_apasat = c_ed.button("✏️ Editează", key=f"edit_btn_{rand['Fișier']}")
-                
-                if c_del.button("❌ Șterge", key=f"del_{rand['Fișier']}"): 
-                    os.remove(f"{DATA_DIR}/{rand['Fișier']}")
-                    st.rerun()
-                
-                if editeaza_apasat:
-                    st.session_state[f"is_editing_{rand['Fișier']}"] = True
-                
-                if st.session_state.get(f"is_editing_{rand['Fișier']}", False):
-                    with st.form(key=f"form_edit_{rand['Fișier']}"):
-                        st.write(f"Modificare raport: {rand['Fișier']}")
-                        
-                        data_curenta_obj = datetime.strptime(rand['Data'], "%d.%m.%Y")
-                        noua_data = st.date_input("Data raportului:", value=data_curenta_obj)
-                        
-                        nou_com = st.number_input("Comenzi:", value=rand['Comenzi'], step=1)
-                        nou_tgt = st.number_input("Target (lei):", value=rand['Target'], format="%.2f", step=0.1)
-                        
-                        col_salveaza, col_anuleaza = st.columns(2)
-                        if col_salveaza.form_submit_button("Salvează Modificările"):
-                            n_zi = noua_data.strftime("%d")
-                            n_luna = noua_data.strftime("%m")
-                            n_an = noua_data.strftime("%Y")
+        if date_rapoarte:
+            st.divider()
+            df_rapoarte = pd.DataFrame(date_rapoarte)
+            
+            df_export = df_rapoarte[['Data', 'Comenzi', 'Target']].copy()
+            csv_data = df_export.to_csv(index=False).encode('utf-8')
+            
+            st.download_button(
+                label="📥 Descarcă Centralizator (CSV)",
+                data=csv_data,
+                file_name="raport_comenzi_presto.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+            
+            st.divider()
+            df_grafic = df_rapoarte.groupby("Data")["Comenzi"].sum().reset_index()
+            st.write("📈 **Evoluție Comenzi Zilnice**")
+            st.bar_chart(df_grafic, x="Data", y="Comenzi", color="#ff4b4b")
+            
+            st.divider()
+            st.write("📋 **Istoric Detaliat Ture (Editează Data / Comenzi / Target sau Șterge)**")
+            
+            for rand in date_rapoarte:
+                with st.container(border=True):
+                    c_info, c_ed, c_del = st.columns([0.6, 0.2, 0.2])
+                    c_info.write(f"📄 **{rand['Data']}** | {rand['Comenzi']} com | {rand['Target']:.2f} lei")
+                    
+                    editeaza_apasat = c_ed.button("✏️ Editează", key=f"edit_btn_{rand['Fișier']}")
+                    
+                    if c_del.button("❌ Șterge", key=f"del_{rand['Fișier']}"): 
+                        os.remove(f"{DATA_DIR}/{rand['Fișier']}")
+                        st.rerun()
+                    
+                    if editeaza_apasat:
+                        st.session_state[f"is_editing_{rand['Fișier']}"] = True
+                    
+                    if st.session_state.get(f"is_editing_{rand['Fișier']}", False):
+                        with st.form(key=f"form_edit_{rand['Fișier']}"):
+                            st.write(f"Modificare raport: {rand['Fișier']}")
                             
-                            parti_vechi = rand['Fișier'].split('_')
-                            ora_veche = parti_vechi[5] if len(parti_vechi) > 5 else "000000.txt"
+                            data_curenta_obj = datetime.strptime(rand['Data'], "%d.%m.%Y")
+                            noua_data = st.date_input("Data raportului:", value=data_curenta_obj)
                             
-                            nume_nou_fisier = f"raport_{OPERATOR_NUME}_{n_zi}_{n_luna}_{n_an}_{ora_veche}"
+                            nou_com = st.number_input("Comenzi:", value=rand['Comenzi'], step=1)
+                            nou_tgt = st.number_input("Target (lei):", value=rand['Target'], format="%.2f", step=0.1)
                             
-                            if rand['Fișier'] != nume_nou_fisier:
-                                if os.path.exists(f"{DATA_DIR}/{rand['Fișier']}"):
-                                    os.remove(f"{DATA_DIR}/{rand['Fișier']}")
-                            
-                            continut_nou = f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}"
-                            with open(f"{DATA_DIR}/{nume_nou_fisier}", "w") as f_out:
-                                f_out.write(continut_nou)
+                            col_salveaza, col_anuleaza = st.columns(2)
+                            if col_salveaza.form_submit_button("Salvează Modificările"):
+                                n_zi = noua_data.strftime("%d")
+                                n_luna = noua_data.strftime("%m")
+                                n_an = noua_data.strftime("%Y")
                                 
-                            salveaza_pe_github(nume_nou_fisier, continut_nou)
+                                parti_vechi = rand['Fișier'].split('_')
+                                ora_veche = parti_vechi[5] if len(parti_vechi) > 5 else "000000.txt"
                                 
-                            st.session_state[f"is_editing_{rand['Fișier']}"] = False
-                            st.success("Modificat cu succes!")
-                            st.rerun()
-                            
-                        if col_anuleaza.form_submit_button("Anulează"):
-                            st.session_state[f"is_editing_{rand['Fișier']}"] = False
-                            st.rerun()
-    else:
-        st.info("Nu există rapoarte salvate încă. Finalizează o tură pentru a vizualiza centralizatorul.")
+                                nume_nou_fisier = f"raport_{OPERATOR_NUME}_{n_zi}_{n_luna}_{n_an}_{ora_veche}"
+                                
+                                if rand['Fișier'] != nume_nou_fisier:
+                                    if os.path.exists(f"{DATA_DIR}/{rand['Fișier']}"):
+                                        os.remove(f"{DATA_DIR}/{rand['Fișier']}")
+                                
+                                continut_nou = f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}"
+                                with open(f"{DATA_DIR}/{nume_nou_fisier}", "w") as f_out:
+                                    f_out.write(continut_nou)
+                                    
+                                salveaza_pe_github(nume_nou_fisier, continut_nou)
+                                    
+                                st.session_state[f"is_editing_{rand['Fișier']}"] = False
+                                st.success("Modificat cu succes!")
+                                st.rerun()
+                                
+                            if col_anuleaza.form_submit_button("Anulează"):
+                                st.session_state[f"is_editing_{rand['Fișier']}"] = False
+                                st.rerun()
+        else:
+            st.info("Nu există rapoarte salvate încă. Finalizează o tură pentru a vizualiza centralizatorul.")
 
-# ==========================================
-# 4. TAB ADMINISTRARE PRODUSE
-# ==========================================
-with tab_admin:
-    st.subheader("➕ Adaugă sau Actualizează Produs")
-    
-    with st.container(border=True):
-        c_nume, c_val, c_btn = st.columns([0.5, 0.25, 0.25])
-        nume_p = c_nume.text_input("Nume Produs:", key="input_nume_p")
-        valoare_p = c_val.number_input("Valoare (lei):", min_value=0.0, step=0.1, format="%.2f")
+    # ==========================================
+    # 4. TAB ADMINISTRARE PRODUSE
+    # ==========================================
+    with tab_admin:
+        st.subheader("➕ Adaugă sau Actualizează Produs")
         
-        c_btn.write("") 
-        c_btn.write("")
-        if c_btn.button("Salvează", use_container_width=True):
-            if nume_p.strip():
-                st.session_state['produse_bonus'][nume_p.strip()] = valoare_p
-                salveaza_produse(st.session_state['produse_bonus'])
-                st.success(f"Salvat: {nume_p}")
-                st.rerun()
-            else:
-                st.warning("Introdu un nume valid.")
-
-    st.subheader("📋 Catalog Produse Active")
-    cautare_p = st.text_input("🔎 Caută în meniu...")
-    
-    for prod, val in list(st.session_state['produse_bonus'].items()):
-        if cautare_p.lower() in prod.lower():
-            with st.container(border=True):
-                col_info, col_del = st.columns([0.8, 0.2])
-                col_info.markdown(f"**{prod}** — {val} lei")
-                if col_del.button("Șterge", key=f"del_p_{prod}", type="secondary", use_container_width=True):
-                    del st.session_state['produse_bonus'][prod]
+        with st.container(border=True):
+            c_nume, c_val, c_btn = st.columns([0.5, 0.25, 0.25])
+            nume_p = c_nume.text_input("Nume Produs:", key="input_nume_p")
+            valoare_p = c_val.number_input("Valoare (lei):", min_value=0.0, step=0.1, format="%.2f")
+            
+            c_btn.write("") 
+            c_btn.write("")
+            if c_btn.button("Salvează", use_container_width=True):
+                if nume_p.strip():
+                    st.session_state['produse_bonus'][nume_p.strip()] = valoare_p
                     salveaza_produse(st.session_state['produse_bonus'])
+                    st.success(f"Salvat: {nume_p}")
                     st.rerun()
+                else:
+                    st.warning("Introdu un nume valid.")
+
+        st.subheader("📋 Catalog Produse Active")
+        cautare_p = st.text_input("🔎 Caută în meniu...")
+        
+        for prod, val in list(st.session_state['produse_bonus'].items()):
+            if cautare_p.lower() in prod.lower():
+                with st.container(border=True):
+                    col_info, col_del = st.columns([0.8, 0.2])
+                    col_info.markdown(f"**{prod}** — {val} lei")
+                    if col_del.button("Șterge", key=f"del_p_{prod}", type="secondary", use_container_width=True):
+                        del st.session_state['produse_bonus'][prod]
+                        salveaza_produse(st.session_state['produse_bonus'])
+                        st.rerun()

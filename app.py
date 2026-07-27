@@ -4,21 +4,44 @@ import pandas as pd
 import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from github import Github
 
-# --- CONFIGURARE FIȘIERE & FOLDERE ---
+# --- CONFIGURARE FIȘIERE & SECRETE HARDCODATE ---
 FILE_NAME = 'contacte.txt'
 DATA_DIR = "rapoarte_zilnice"
 STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
-PAROLA_DISPECERAT = "presto2026"  # Poți schimba parola de aici
+PAROLA_DISPECERAT = "presto2026"
+
+# Datele tale de GitHub integrate direct
+GITHUB_TOKEN_VAL = "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"
+GITHUB_REPO_VAL = "Mckyto/predict"
 
 if not os.path.exists(DATA_DIR): 
     os.makedirs(DATA_DIR)
 if not os.path.exists(FILE_NAME): 
     open(FILE_NAME, "w").close()
 
-# --- FUNCȚII PERSISTENȚĂ SESIUNE (AUTO-SAVE) ---
+# --- FUNCȚIE SALVARE AUTOMATĂ PE GITHUB ---
+def salveaza_pe_github(nume_fisier, continut_text):
+    try:
+        g = Github(GITHUB_TOKEN_VAL)
+        repo = g.get_repo(GITHUB_REPO_VAL)
+        path = f"{DATA_DIR}/{nume_fisier}"
+        message = f"Adaugă raport automat {nume_fisier}"
+        
+        try:
+            file = repo.get_contents(path)
+            repo.update_file(path, message, continut_text, file.sha)
+        except:
+            repo.create_file(path, message, continut_text)
+        return True
+    except Exception as e:
+        st.warning(f"Salvarea pe GitHub a eșuat, s-a salvat doar local: {e}")
+    return False
+
+# --- FUNCȚII PERSISTENȚĂ SESIUNE ---
 def salveaza_sesiune(start, actual, lista):
     with open(STATE_FILE, "w") as f:
         json.dump({"start": start, "actual": actual, "lista": lista}, f)
@@ -130,7 +153,7 @@ with tab_livr:
                         st.rerun()
 
 # ==========================================
-# 2. TAB DISPECERAT & TARGET (Auto-Save Activ)
+# 2. TAB DISPECERAT & TARGET (Protejat cu parolă)
 # ==========================================
 with tab_disp:
     if not st.session_state['autentificat_disp']:
@@ -144,7 +167,7 @@ with tab_disp:
             else:
                 st.error("Parolă incorectă!")
     else:
-        col_ deconectare, col_status = st.columns([0.8, 0.2])
+        col_deconectare, col_status = st.columns([0.8, 0.2])
         col_status.caption("⚡ Auto-Save activat")
         if col_deconectare.button("🔒 Deconectare"):
             st.session_state['autentificat_disp'] = False
@@ -155,7 +178,6 @@ with tab_disp:
         start = col_st.number_input("Start:", value=s.get('start', 0), step=1)
         actual = col_ac.number_input("Act:", value=s.get('actual', 0), step=1)
         
-        # Salvăm automat în fișier imediat ce se modifică valorile de start sau actual
         if start != s.get('start', 0) or actual != s.get('actual', 0):
             s['start'] = start
             s['actual'] = actual
@@ -175,9 +197,15 @@ with tab_disp:
             if st.button("💾 Salvează și Închide Tura"):
                 t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
                 ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
-                with open(f"{DATA_DIR}/raport_{OPERATOR_NUME}_{ora_ro}.txt", "w") as f:
-                    f.write(f"{OPERATOR_NUME}|{actual - start}|{t_t}")
-                st.success("Salvat!")
+                nume_fisier = f"raport_{OPERATOR_NUME}_{ora_ro}.txt"
+                continut_raport = f"{OPERATOR_NUME}|{actual - start}|{t_t}"
+                
+                with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
+                    f.write(continut_raport)
+                
+                salveaza_pe_github(nume_fisier, continut_raport)
+                
+                st.success("Salvat cu succes local și pe GitHub!")
                 salveaza_sesiune(0, 0, [])
                 st.session_state['s_data'] = incarca_sesiune()
                 st.rerun()
@@ -306,8 +334,11 @@ with tab_centr:
                                 if os.path.exists(f"{DATA_DIR}/{rand['Fișier']}"):
                                     os.remove(f"{DATA_DIR}/{rand['Fișier']}")
                             
+                            continut_nou = f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}"
                             with open(f"{DATA_DIR}/{nume_nou_fisier}", "w") as f_out:
-                                f_out.write(f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}")
+                                f_out.write(continut_nou)
+                                
+                            salveaza_pe_github(nume_nou_fisier, continut_nou)
                                 
                             st.session_state[f"is_editing_{rand['Fișier']}"] = False
                             st.success("Modificat cu succes!")

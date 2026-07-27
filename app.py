@@ -131,12 +131,11 @@ if not st.session_state['autentificat_general']:
                 st.rerun()
             else:
                 st.error("Utilizator sau parolă incorecte!")
-    st.stop-wrapper = st.stop() # Oprește rularea restului aplicației dacă nu e logat
+    st.stop()
 else:
     # --- DACĂ ESTE LOGAT, AFIȘĂM APLICAȚIA COMPLETĂ ---
     st.title("🍕 Asistent Dispecerat Presto")
     
-    # Buton de deconectare în sidebar sau sus
     if st.sidebar.button("🔒 Deconectare aplicație"):
         st.session_state['autentificat_general'] = False
         st.rerun()

@@ -18,7 +18,7 @@ if not os.path.exists(DATA_DIR):
 if not os.path.exists(FILE_NAME): 
     open(FILE_NAME, "w").close()
 
-# --- FUNCȚII PERSISTENȚĂ SESIUNE ---
+# --- FUNCȚII PERSISTENȚĂ SESIUNE (AUTO-SAVE) ---
 def salveaza_sesiune(start, actual, lista):
     with open(STATE_FILE, "w") as f:
         json.dump({"start": start, "actual": actual, "lista": lista}, f)
@@ -130,7 +130,7 @@ with tab_livr:
                         st.rerun()
 
 # ==========================================
-# 2. TAB DISPECERAT & TARGET (Protejat cu parolă)
+# 2. TAB DISPECERAT & TARGET (Auto-Save Activ)
 # ==========================================
 with tab_disp:
     if not st.session_state['autentificat_disp']:
@@ -144,7 +144,9 @@ with tab_disp:
             else:
                 st.error("Parolă incorectă!")
     else:
-        if st.button("🔒 Deconectare"):
+        col_ deconectare, col_status = st.columns([0.8, 0.2])
+        col_status.caption("⚡ Auto-Save activat")
+        if col_deconectare.button("🔒 Deconectare"):
             st.session_state['autentificat_disp'] = False
             st.rerun()
             
@@ -153,6 +155,7 @@ with tab_disp:
         start = col_st.number_input("Start:", value=s.get('start', 0), step=1)
         actual = col_ac.number_input("Act:", value=s.get('actual', 0), step=1)
         
+        # Salvăm automat în fișier imediat ce se modifică valorile de start sau actual
         if start != s.get('start', 0) or actual != s.get('actual', 0):
             s['start'] = start
             s['actual'] = actual

@@ -150,10 +150,10 @@ with tab_disp:
             
         st.divider()
         col_st, col_ac = st.columns(2)
-        start = col_st.number_input("Start:", value=s['start'], step=1)
-        actual = col_ac.number_input("Act:", value=s['actual'], step=1)
+        start = col_st.number_input("Start:", value=s.get('start', 0), step=1)
+        actual = col_ac.number_input("Act:", value=s.get('actual', 0), step=1)
         
-        if start != s['start'] or actual != s['actual']:
+        if start != s.get('start', 0) or actual != s.get('actual', 0):
             s['start'] = start
             s['actual'] = actual
             salveaza_sesiune(s['start'], s['actual'], s['lista'])

@@ -26,13 +26,13 @@ if not os.path.exists(DATA_DIR):
 if not os.path.exists(FILE_NAME): 
     open(FILE_NAME, "w").close()
 
-# --- FUNCȚIE SALVARE AUTOMATĂ PE GITHUB ---
+# --- FUNCȚII GESTIONARE GITHUB (SALVARE & CITIRE STARE & RAPOARTE) ---
 def salveaza_pe_github(nume_fisier, continut_text):
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
         path = f"{DATA_DIR}/{nume_fisier}"
-        message = f"Adaugă raport automat {nume_fisier}"
+        message = f"Actualizare fișier {nume_fisier}"
         
         try:
             file = repo.get_contents(path)
@@ -41,15 +41,54 @@ def salveaza_pe_github(nume_fisier, continut_text):
             repo.create_file(path, message, continut_text)
         return True
     except Exception as e:
-        st.warning(f"Salvarea pe GitHub a eșuat, s-a salvat doar local: {e}")
+        pass
     return False
 
-# --- FUNCȚII PERSISTENȚĂ SESIUNE ---
+def salveaza_stare_pe_github(start, actual, lista):
+    date_stare = {"start": start, "actual": actual, "lista": lista}
+    continut = json.dumps(date_stare)
+    try:
+        g = Github(GITHUB_TOKEN_VAL)
+        repo = g.get_repo(GITHUB_REPO_VAL)
+        path = "stare_curenta.json"
+        message = "Auto-save stare curentă"
+        try:
+            file = repo.get_contents(path)
+            repo.update_file(path, message, continut, file.sha)
+        except:
+            repo.create_file(path, message, continut)
+    except:
+        pass
+
+def incarca_stare_de_pe_github():
+    try:
+        g = Github(GITHUB_TOKEN_VAL)
+        repo = g.get_repo(GITHUB_REPO_VAL)
+        file = repo.get_contents("stare_curenta.json")
+        data = json.loads(file.decoded_content.decode('utf-8'))
+        return {
+            "start": data.get("start", 0), 
+            "actual": data.get("actual", 0), 
+            "lista": data.get("lista", [])
+        }
+    except:
+        return {"start": 0, "actual": 0, "lista": []}
+
+# --- FUNCȚII PERSISTENȚĂ LOCALĂ & SESIUNE ---
 def salveaza_sesiune(start, actual, lista):
+    # Salvăm local
     with open(STATE_FILE, "w") as f:
         json.dump({"start": start, "actual": actual, "lista": lista}, f)
+    # Salvăm instant și pe GitHub pentru a preveni pierderea datelor la inactivitate
+    salveaza_stare_pe_github(start, actual, lista)
 
 def incarca_sesiune():
+    # Încercăm mai întâi din starea salvată pe GitHub (în caz de reset/inactivitate)
+    stare_gh = incarca_stare_de_pe_github()
+    if stare_gh["actual"] > 0 or len(stare_gh["lista"]) > 0:
+        return stare_gh
+
+    # Fallback pe fișierul local
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE, "r") as f: 
@@ -72,7 +111,7 @@ def incarca_produse():
     
     produse_default = {
         "Baclava": 1.0, "Tiramisu": 1.0, "Cheesecake": 1.0, "Kataif": 1.0, 
-        "Placinta cu mere": 1.0, "Salam de biscuiti": 1.0, "Gogosi": 1.0, 
+        "Placinta cu iaurt": 1.0, "Salam de biscuiti": 1.0, "Gogosi": 1.0, 
         "Bucket gogosi": 1.0, "Inghetata": 1.0, "Limonada": 1.0, 
         "Hamburger pui": 0.2, "Painica mare": 0.5, "Paste Quattro Formaggi": 1.0, 
         "Pizza Napoletta": 1.0, "Painica napolettana": 0.5, "Pita Gyros": 1.0, 
@@ -111,7 +150,6 @@ def sterge_livrator(nume_de_sters):
 # --- INTERFAȚĂ PRINCIPALĂ & AUTENTIFICARE GENERALĂ ---
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 
-# Verificăm starea de logare la nivelul întregii aplicații
 if 'autentificat_general' not in st.session_state:
     st.session_state['autentificat_general'] = False
 
@@ -133,7 +171,6 @@ if not st.session_state['autentificat_general']:
                 st.error("Utilizator sau parolă incorecte!")
     st.stop()
 else:
-    # --- DACĂ ESTE LOGAT, AFIȘĂM APLICAȚIA COMPLETĂ ---
     st.title("🍕 Asistent Dispecerat Presto")
     
     if st.sidebar.button("🔒 Deconectare aplicație"):
@@ -216,9 +253,11 @@ else:
                 
                 salveaza_pe_github(nume_fisier, continut_raport)
                 
-                st.success("Salvat cu succes local și pe GitHub!")
+                # Resetăm sesiunea și ștergem starea temporară de pe GitHub
                 salveaza_sesiune(0, 0, [])
+                salveaza_stare_pe_github(0, 0, [])
                 st.session_state['s_data'] = incarca_sesiune()
+                st.success("Tura a fost închisă și salvată cu succes!")
                 st.rerun()
 
         with c2:
@@ -251,6 +290,7 @@ else:
                     if st.button("RESET TARGET"): 
                         salveaza_sesiune(s['start'], s['actual'], [])
                         s['lista'] = []
+                        salveaza_stare_pe_github(s['start'], s['actual'], [])
                         st.rerun()
 
     # ==========================================

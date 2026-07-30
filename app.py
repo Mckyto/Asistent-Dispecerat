@@ -254,10 +254,11 @@ if s.get('tura_activa'):
     except:
         pass
 
-# --- ORGANIZARE TAB-URI ---
-tab_livr, tab_disp, tab_pontaj, tab_centr, tab_admin = st.tabs([
+# --- ORGANIZARE TAB-URI (Inclusiv Calculator Procent) ---
+tab_livr, tab_disp, tab_calc, tab_pontaj, tab_centr, tab_admin = st.tabs([
     "🛵 Gestionare Livratori", 
     "⚙️ Dispecerat & Target", 
+    "🧮 Calculator Procent",
     "🕐 Pontaj", 
     "📊 Centralizator", 
     "🛠️ Admin Produse"
@@ -311,7 +312,7 @@ with tab_disp:
     
     c1, c2 = st.columns([0.4, 0.6])
     with c1:
-        with st.expander("🧮 Calculator Discount", expanded=True):
+        with st.expander("🧮 Calculator Discount Vechi", expanded=True):
             p = st.number_input("Total (preț):", format="%.2f", key="calc_pret")
             s_val = st.number_input("Încasat:", format="%.2f", key="calc_incasat")
             if st.button("Calculează Discount"):
@@ -368,7 +369,59 @@ with tab_disp:
                     st.rerun()
 
 # ==========================================
-# 3. TAB PONTAJ
+# 3. TAB CALCULATOR PROCENT
+# ==========================================
+with tab_calc:
+    st.subheader("🧮 Calculator Avansat de Procentaje")
+    
+    optiune_calc = st.radio(
+        "Ce vrei să calculezi?",
+        [
+            "1. Cât reprezintă X % dintr-o sumă?",
+            "2. Ce procent reprezintă o parte dintr-un total?",
+            "3. Aplică o creștere sau reducere procentuală"
+        ]
+    )
+    
+    st.divider()
+    
+    if optiune_calc.startswith("1"):
+        st.markdown("#### Cât înseamnă un procent dintr-o sumă?")
+        col_c1, col_c2 = st.columns(2)
+        val_suma = col_c1.number_input("Valoarea totală (ex: 250):", value=100.0, step=1.0, key="c1_sum")
+        val_proc = col_c2.number_input("Procentul % (ex: 15):", value=10.0, step=0.5, key="c1_procent")
+        
+        rezultat1 = (val_suma * val_proc) / 100
+        st.success(f"**Rezultat:** {val_proc}% din {val_suma} este **{rezultat1:.2f}**")
+
+    elif optiune_calc.startswith("2"):
+        st.markdown("#### Ce procent reprezintă o parte din total?")
+        col_c1, col_c2 = st.columns(2)
+        val_parte = col_c1.number_input("Valoarea parțială (ex: 30):", value=20.0, step=1.0, key="c2_parte")
+        val_total = col_c2.number_input("Valoarea totală (ex: 150):", value=100.0, step=1.0, key="c2_total")
+        
+        if val_total > 0:
+            rezultat2 = (val_parte / val_total) * 100
+            st.success(f"**Rezultat:** {val_parte} reprezintă **{rezultat2:.2f}%** din {val_total}")
+        else:
+            st.error("Totalul trebuie să fie mai mare decât 0.")
+
+    else:
+        st.markdown("#### Creștere sau Reducere Procentuală")
+        col_c1, col_c2, col_c3 = st.columns(3)
+        val_baza = col_c1.number_input("Suma inițială:", value=100.0, step=1.0, key="c3_baza")
+        val_p = col_c2.number_input("Procentul %:", value=10.0, step=0.5, key="c3_p")
+        tip_operatie = col_c3.selectbox("Operație:", ["Creștere (+)", "Reducere (-)"])
+        
+        if tip_operatie.startswith("Creștere"):
+            rezultat3 = val_baza + (val_baza * val_p / 100)
+            st.success(f"**Rezultat după creștere:** **{rezultat3:.2f}** (Diferență: +{(val_baza * val_p / 100):.2f})")
+        else:
+            rezultat3 = val_baza - (val_baza * val_p / 100)
+            st.success(f"**Rezultat după reducere:** **{rezultat3:.2f}** (Diferență: -{(val_baza * val_p / 100):.2f})")
+
+# ==========================================
+# 4. TAB PONTAJ
 # ==========================================
 with tab_pontaj:
     st.subheader("🕐 Sistem de Pontaj Operator")
@@ -428,7 +481,7 @@ with tab_pontaj:
         st.info("Nu există înregistrări în pontaj.")
 
 # ==========================================
-# 4. TAB CENTRALIZATOR & STATISTICI PRODUSE
+# 5. TAB CENTRALIZATOR & STATISTICI PRODUSE
 # ==========================================
 with tab_centr:
     st.subheader("📊 Analiză, Istoric Ture & Pondere Produse")
@@ -567,7 +620,7 @@ with tab_centr:
         st.info("Nu există rapoarte salvate încă. Finalizează o tură pentru a vizualiza centralizatorul.")
 
 # ==========================================
-# 5. TAB ADMINISTRARE PRODUSE
+# 6. TAB ADMINISTRARE PRODUSE
 # ==========================================
 with tab_admin:
     st.subheader("➕ Adaugă sau Actualizează Produs")

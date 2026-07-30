@@ -154,12 +154,17 @@ def incarca_produse():
     if os.path.exists(PRODUSE_FILE):
         try:
             with open(PRODUSE_FILE, "r") as f:
-                return json.load(f)
+                produse = json.load(f)
+                # Dacă vechiul fișier are încă "Placinta cu iaurt", o înlocuim automat
+                if "Placinta cu iaurt" in produse:
+                    produse["Placinta cu mere"] = produse.pop("Placinta cu iaurt")
+                    salveaza_produse(produse)
+                return produse
         except: pass
     
     produse_default = {
         "Baclava": 1.0, "Tiramisu": 1.0, "Cheesecake": 1.0, "Kataif": 1.0, 
-        "Placinta cu iaurt": 1.0, "Salam de biscuiti": 1.0, "Gogosi": 1.0, 
+        "Placinta cu mere": 1.0, "Salam de biscuiti": 1.0, "Gogosi": 1.0, 
         "Bucket gogosi": 1.0, "Inghetata": 1.0, "Limonada": 1.0, 
         "Hamburger pui": 0.2, "Painica mare": 0.5, "Paste Quattro Formaggi": 1.0, 
         "Pizza Napoletta": 1.0, "Painica napolettana": 0.5, "Pita Gyros": 1.0, 
@@ -170,7 +175,7 @@ def incarca_produse():
     }
     with open(PRODUSE_FILE, "w") as f:
         json.dump(produse_default, f)
-    salveaza_fisier_pe_github(PRODUSE_FILE, "Init produse default")
+    salveaza_fisier_pe_github(PRODUSE_FILE, "Init produse default cu placinta de mere")
     return produse_default
 
 def salveaza_produse(produse_dict):
@@ -218,20 +223,16 @@ if s.get('tura_activa'):
         timp_inceput = timp_inceput.replace(tzinfo=ZoneInfo("Europe/Bucharest"))
         timp_acum = datetime.now(ZoneInfo("Europe/Bucharest"))
         
-        # Dacă au trecut mai mult de 12 ore de la începerea turei
         if timp_acum - timp_inceput >= timedelta(hours=12):
-            # 1. Calculăm raportul automat
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
             ora_ro = timp_acum.strftime('%d_%m_%Y_%H%M%S')
             nume_fisier = f"raport_{OPERATOR_NUME}_{ora_ro}.txt"
             continut_raport = f"{OPERATOR_NUME}|{s.get('actual', 0) - s.get('start', 0)}|{t_t}"
             
-            # Salvăm raportul pe disc și pe GitHub
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
             salveaza_fisier_pe_github(f"{DATA_DIR}/{nume_fisier}", continut_raport)
             
-            # 2. Salvăm în pontaj că tura a durat exact 12 ore
             timp_sfarsit = timp_inceput + timedelta(hours=12)
             istoric_pontaj = incarca_pontaj()
             istoric_pontaj.append({
@@ -243,7 +244,6 @@ if s.get('tura_activa'):
             })
             salveaza_pontaj(istoric_pontaj)
             
-            # 3. Resetăm sesiunea și starea curentă
             s['start'] = 0
             s['actual'] = 0
             s['lista'] = []

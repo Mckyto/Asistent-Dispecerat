@@ -26,23 +26,56 @@ if not os.path.exists(DATA_DIR):
 if not os.path.exists(FILE_NAME): 
     open(FILE_NAME, "w").close()
 
-# --- FUNCȚII GESTIONARE GITHUB (SALVARE & CITIRE STARE & RAPOARTE) ---
-def salveaza_pe_github(nume_fisier, continut_text):
+# --- FUNCȚII GESTIONARE GITHUB (SYNC TOTAL) ---
+def sincronizeaza_de_pe_github():
+    """Descarcă automat de pe GitHub livratorii, produsele și rapoartele la pornire."""
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
-        path = f"{DATA_DIR}/{nume_fisier}"
-        message = f"Actualizare fișier {nume_fisier}"
+        
+        # 1. Sincronizare livratori (contacte.txt)
+        try:
+            file_livr = repo.get_contents(FILE_NAME)
+            with open(FILE_NAME, "w") as f:
+                f.write(file_livr.decoded_content.decode('utf-8'))
+        except: pass
+
+        # 2. Sincronizare produse (produse.json)
+        try:
+            file_prod = repo.get_contents(PRODUSE_FILE)
+            with open(PRODUSE_FILE, "w") as f:
+                f.write(file_prod.decoded_content.decode('utf-8'))
+        except: pass
+
+        # 3. Sincronizare rapoarte din folder
+        try:
+            contents = repo.get_contents(DATA_DIR)
+            for content_file in contents:
+                if content_file.name.startswith("raport_"):
+                    local_path = f"{DATA_DIR}/{content_file.name}"
+                    if not os.path.exists(local_path):
+                        with open(local_path, "w") as f:
+                            f.write(content_file.decoded_content.decode('utf-8'))
+        except: pass
+    except:
+        pass
+
+def salveaza_fisier_pe_github(path_fisier, mesaj_commit):
+    """Trimite orice fișier local direct pe GitHub."""
+    try:
+        g = Github(GITHUB_TOKEN_VAL)
+        repo = g.get_repo(GITHUB_REPO_VAL)
+        with open(path_fisier, "r", encoding="utf-8") as f:
+            continut = f.read()
         
         try:
-            file = repo.get_contents(path)
-            repo.update_file(path, message, continut_text, file.sha)
+            file = repo.get_contents(path_fisier)
+            repo.update_file(path_fisier, mesaj_commit, continut, file.sha)
         except:
-            repo.create_file(path, message, continut_text)
+            repo.create_file(path_fisier, mesaj_commit, continut)
         return True
-    except Exception as e:
-        pass
-    return False
+    except:
+        return False
 
 def salveaza_stare_pe_github(start, actual, lista):
     date_stare = {"start": start, "actual": actual, "lista": lista}
@@ -51,12 +84,11 @@ def salveaza_stare_pe_github(start, actual, lista):
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
         path = "stare_curenta.json"
-        message = "Auto-save stare curentă"
         try:
             file = repo.get_contents(path)
-            repo.update_file(path, message, continut, file.sha)
+            repo.update_file(path, "Auto-save stare curentă", continut, file.sha)
         except:
-            repo.create_file(path, message, continut)
+            repo.create_file(path, "Auto-save stare curentă", continut)
     except:
         pass
 
@@ -74,21 +106,20 @@ def incarca_stare_de_pe_github():
     except:
         return {"start": 0, "actual": 0, "lista": []}
 
-# --- FUNCȚII PERSISTENȚĂ LOCALĂ & SESIUNE ---
+# Sincronizăm datele de pe GitHub chiar la rulare
+sincronizeaza_de_pe_github()
+
+# --- FUNCȚII PERSISTENȚĂ SESIUNE ---
 def salveaza_sesiune(start, actual, lista):
-    # Salvăm local
     with open(STATE_FILE, "w") as f:
         json.dump({"start": start, "actual": actual, "lista": lista}, f)
-    # Salvăm instant și pe GitHub pentru a preveni pierderea datelor la inactivitate
     salveaza_stare_pe_github(start, actual, lista)
 
 def incarca_sesiune():
-    # Încercăm mai întâi din starea salvată pe GitHub (în caz de reset/inactivitate)
     stare_gh = incarca_stare_de_pe_github()
     if stare_gh["actual"] > 0 or len(stare_gh["lista"]) > 0:
         return stare_gh
 
-    # Fallback pe fișierul local
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE, "r") as f: 
@@ -122,11 +153,13 @@ def incarca_produse():
     }
     with open(PRODUSE_FILE, "w") as f:
         json.dump(produse_default, f)
+    salveaza_fisier_pe_github(PRODUSE_FILE, "Init produse default")
     return produse_default
 
 def salveaza_produse(produse_dict):
     with open(PRODUSE_FILE, "w") as f:
         json.dump(produse_dict, f)
+    salveaza_fisier_pe_github(PRODUSE_FILE, "Actualizare catalog produse")
 
 # --- FUNCȚII LIVRATORI ---
 def incarca_livratori():
@@ -138,6 +171,7 @@ def incarca_livratori():
 def salveaza_livrator_nou(nume):
     with open(FILE_NAME, "a") as f: 
         f.write(nume + "\n")
+    salveaza_fisier_pe_github(FILE_NAME, "Adăugare livrator nou")
 
 def sterge_livrator(nume_de_sters):
     lista = incarca_livratori()
@@ -146,6 +180,7 @@ def sterge_livrator(nume_de_sters):
         with open(FILE_NAME, "w") as f:
             for nume in lista: 
                 f.write(nume + "\n")
+        salveaza_fisier_pe_github(FILE_NAME, "Ștergere livrator")
 
 # --- INTERFAȚĂ PRINCIPALĂ & AUTENTIFICARE GENERALĂ ---
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
@@ -202,7 +237,7 @@ else:
             if st.button("Salvează livrator"):
                 if n_n.strip():
                     salveaza_livrator_nou(n_n.strip())
-                    st.success(f"Livratorul {n_n} a fost adăugat!")
+                    st.success(f"Livratorul {n_n} a fost adăugat și salvat permanent!")
                     st.rerun()
                 else:
                     st.warning("Introdu un nume valid.")
@@ -251,9 +286,8 @@ else:
                 with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                     f.write(continut_raport)
                 
-                salveaza_pe_github(nume_fisier, continut_raport)
+                salveaza_fisier_pe_github(f"{DATA_DIR}/{nume_fisier}", continut_raport)
                 
-                # Resetăm sesiunea și ștergem starea temporară de pe GitHub
                 salveaza_sesiune(0, 0, [])
                 salveaza_stare_pe_github(0, 0, [])
                 st.session_state['s_data'] = incarca_sesiune()
@@ -355,6 +389,13 @@ else:
                     
                     if c_del.button("❌ Șterge", key=f"del_{rand['Fișier']}"): 
                         os.remove(f"{DATA_DIR}/{rand['Fișier']}")
+                        # Ștergem și de pe GitHub
+                        try:
+                            g = Github(GITHUB_TOKEN_VAL)
+                            repo = g.get_repo(GITHUB_REPO_VAL)
+                            file_gh = repo.get_contents(f"{DATA_DIR}/{rand['Fișier']}")
+                            repo.delete_file(file_gh.path, "Ștergere raport", file_gh.sha)
+                        except: pass
                         st.rerun()
                     
                     if editeaza_apasat:
@@ -384,12 +425,18 @@ else:
                                 if rand['Fișier'] != nume_nou_fisier:
                                     if os.path.exists(f"{DATA_DIR}/{rand['Fișier']}"):
                                         os.remove(f"{DATA_DIR}/{rand['Fișier']}")
+                                    try:
+                                        g = Github(GITHUB_TOKEN_VAL)
+                                        repo = g.get_repo(GITHUB_REPO_VAL)
+                                        file_gh = repo.get_contents(f"{DATA_DIR}/{rand['Fișier']}")
+                                        repo.delete_file(file_gh.path, "Ștergere fișier vechi la editare", file_gh.sha)
+                                    except: pass
                                 
                                 continut_nou = f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}"
                                 with open(f"{DATA_DIR}/{nume_nou_fisier}", "w") as f_out:
                                     f_out.write(continut_nou)
                                     
-                                salveaza_pe_github(nume_nou_fisier, continut_nou)
+                                salveaza_fisier_pe_github(f"{DATA_DIR}/{nume_nou_fisier}", continut_nou)
                                     
                                 st.session_state[f"is_editing_{rand['Fișier']}"] = False
                                 st.success("Modificat cu succes!")

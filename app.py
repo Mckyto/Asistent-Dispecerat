@@ -155,7 +155,6 @@ def incarca_produse():
         try:
             with open(PRODUSE_FILE, "r") as f:
                 produse = json.load(f)
-                # Dacă vechiul fișier are încă "Placinta cu iaurt", o înlocuim automat
                 if "Placinta cu iaurt" in produse:
                     produse["Placinta cu mere"] = produse.pop("Placinta cu iaurt")
                     salveaza_produse(produse)
@@ -326,7 +325,7 @@ with tab_disp:
             
             salveaza_sesiune(0, 0, [], None)
             st.session_state['s_data'] = incarca_sesiune()
-            st.success("Tura a fost închisă și salvată cu succes!")
+            st.success("Tura a fost încheiată și salvată cu succes!")
             st.rerun()
 
     with c2:
@@ -422,10 +421,32 @@ with tab_pontaj:
         st.info("Nu există înregistrări în pontaj.")
 
 # ==========================================
-# 4. TAB CENTRALIZATOR & EDITARE RAPOARTE
+# 4. TAB CENTRALIZATOR & STATISTICI PRODUSE
 # ==========================================
 with tab_centr:
-    st.subheader("📊 Analiză și Istoric Ture")
+    st.subheader("📊 Analiză, Istoric Ture & Pondere Produse")
+    
+    # Secțiune Procentaj Produse în Tura Curentă
+    if s['lista']:
+        st.markdown("### 📈 Ponderea produselor în targetul turei curente")
+        df_curent = pd.DataFrame(s['lista'])
+        
+        # Agrupăm după produs: număr bucăți și valoare totală per produs
+        df_stats = df_curent.groupby('nume').agg(
+            Bucati=('val', 'count'),
+            ValoareTotala=('val', 'sum')
+        ).reset_index()
+        
+        total_valoare_tura = df_stats['ValoareTotala'].sum()
+        df_stats['Procent (%)'] = (df_stats['ValoareTotala'] / total_valoare_tura * 100).round(2)
+        df_stats['ValoareTotala'] = df_stats['ValoareTotala'].apply(lambda x: f"{x:.2f} lei")
+        df_stats['Procent (%)'] = df_stats['Procent (%)'].apply(lambda x: f"{x}%")
+        
+        # Redenumim coloanele pentru afișare clară
+        df_stats.columns = ["Produs", "Bucăți", "Valoare (lei)", "Procent din Target"]
+        st.dataframe(df_stats, use_container_width=True)
+        st.divider()
+
     total_com, total_tgt = 0, 0
     date_rapoarte = []
     

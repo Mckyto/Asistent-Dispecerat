@@ -264,29 +264,35 @@ tab_livr, tab_disp, tab_pontaj, tab_centr, tab_admin = st.tabs([
 ])
 
 # ==========================================
-# 1. TAB LIVRATORI
+# 1. TAB LIVRATORI (Căutare + Întrebare auto adăugare)
 # ==========================================
 with tab_livr:
-    with st.expander("➕ Adaugă livrator nou"):
-        n_n = st.text_input("Nume livrator:")
-        if st.button("Salvează livrator"):
-            if n_n.strip():
-                salveaza_livrator_nou(n_n.strip())
-                st.success(f"Livratorul {n_n} a fost adăugat și salvat permanent!")
-                st.rerun()
-            else:
-                st.warning("Introdu un nume valid.")
-                
-    cautare = st.text_input("🔎 Căutare livrator:")
-    if cautare:
-        for n in incarca_livratori():
-            if cautare.lower() in n.lower():
+    st.subheader("🛵 Căutare & Gestionare Livratori")
+    cautare = st.text_input("🔎 Introdu numele livratorului pentru căutare:")
+    
+    livratori_existenti = incarca_livratori()
+    
+    if cautare.strip():
+        termen = cautare.strip().lower()
+        gasiti = [n for n in livratori_existenti if termen in n.lower()]
+        
+        if gasiti:
+            st.write("Rezultate găsite:")
+            for n in gasiti:
                 with st.container(border=True):
                     c_i, c_a = st.columns([0.7, 0.3])
                     c_i.markdown(f"**{n.upper()}**")
                     if c_a.button("Șterge", key=f"d_{n}"):
                         sterge_livrator(n)
                         st.rerun()
+        else:
+            st.warning(f"Livratorul **'{cautare.strip()}'** nu există în listă.")
+            if st.button(f"➕ Adaugă-l pe '{cautare.strip()}' în baza de date"):
+                salveaza_livrator_nou(cautare.strip())
+                st.success(f"Livratorul {cautare.strip()} a fost adăugat și salvat permanent!")
+                st.rerun()
+    else:
+        st.info("Introdu un nume în căsuța de sus pentru a verifica sau găsi un livrator.")
 
 # ==========================================
 # 2. TAB DISPECERAT & TARGET
@@ -426,12 +432,10 @@ with tab_pontaj:
 with tab_centr:
     st.subheader("📊 Analiză, Istoric Ture & Pondere Produse")
     
-    # Secțiune Procentaj Produse în Tura Curentă
     if s['lista']:
         st.markdown("### 📈 Ponderea produselor în targetul turei curente")
         df_curent = pd.DataFrame(s['lista'])
         
-        # Agrupăm după produs: număr bucăți și valoare totală per produs
         df_stats = df_curent.groupby('nume').agg(
             Bucati=('val', 'count'),
             ValoareTotala=('val', 'sum')
@@ -442,7 +446,6 @@ with tab_centr:
         df_stats['ValoareTotala'] = df_stats['ValoareTotala'].apply(lambda x: f"{x:.2f} lei")
         df_stats['Procent (%)'] = df_stats['Procent (%)'].apply(lambda x: f"{x}%")
         
-        # Redenumim coloanele pentru afișare clară
         df_stats.columns = ["Produs", "Bucăți", "Valoare (lei)", "Procent din Target"]
         st.dataframe(df_stats, use_container_width=True)
         st.divider()

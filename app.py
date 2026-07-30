@@ -2,12 +2,13 @@ import streamlit as st
 import os
 import pandas as pd
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from github import Github
 
 # --- CONFIGURARE FIȘIERE & SECRETE ---
 FILE_NAME = 'contacte.txt'
+PONTAJ_FILE = 'pontaj.json'
 DATA_DIR = "rapoarte_zilnice"
 STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
@@ -21,29 +22,35 @@ if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 if not os.path.exists(FILE_NAME): 
     open(FILE_NAME, "w").close()
+if not os.path.exists(PONTAJ_FILE):
+    with open(PONTAJ_FILE, "w") as f:
+        json.dump([], f)
 
 # --- FUNCȚII GESTIONARE GITHUB (SYNC TOTAL) ---
 def sincronizeaza_de_pe_github():
-    """Descarcă automat de pe GitHub livratorii, produsele și rapoartele la pornire."""
+    """Descarcă automat de pe GitHub livratorii, produsele, pontajul și rapoartele la pornire."""
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
         
-        # 1. Sincronizare livratori (contacte.txt)
         try:
             file_livr = repo.get_contents(FILE_NAME)
             with open(FILE_NAME, "w") as f:
                 f.write(file_livr.decoded_content.decode('utf-8'))
         except: pass
 
-        # 2. Sincronizare produse (produse.json)
         try:
             file_prod = repo.get_contents(PRODUSE_FILE)
             with open(PRODUSE_FILE, "w") as f:
                 f.write(file_prod.decoded_content.decode('utf-8'))
         except: pass
 
-        # 3. Sincronizare rapoarte din folder
+        try:
+            file_pontaj = repo.get_contents(PONTAJ_FILE)
+            with open(PONTAJ_FILE, "w") as f:
+                f.write(file_pontaj.decoded_content.decode('utf-8'))
+        except: pass
+
         try:
             contents = repo.get_contents(DATA_DIR)
             for content_file in contents:
@@ -57,7 +64,6 @@ def sincronizeaza_de_pe_github():
         pass
 
 def salveaza_fisier_pe_github(path_fisier, mesaj_commit):
-    """Trimite orice fișier local direct pe GitHub."""
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
@@ -73,8 +79,8 @@ def salveaza_fisier_pe_github(path_fisier, mesaj_commit):
     except:
         return False
 
-def salveaza_stare_pe_github(start, actual, lista):
-    date_stare = {"start": start, "actual": actual, "lista": lista}
+def salveaza_stare_pe_github(start, actual, lista, tura_activa=None):
+    date_stare = {"start": start, "actual": actual, "lista": lista, "tura_activa": tura_activa}
     continut = json.dumps(date_stare)
     try:
         g = Github(GITHUB_TOKEN_VAL)
@@ -97,23 +103,37 @@ def incarca_stare_de_pe_github():
         return {
             "start": data.get("start", 0), 
             "actual": data.get("actual", 0), 
-            "lista": data.get("lista", [])
+            "lista": data.get("lista", []),
+            "tura_activa": data.get("tura_activa", None)
         }
     except:
-        return {"start": 0, "actual": 0, "lista": []}
+        return {"start": 0, "actual": 0, "lista": [], "tura_activa": None}
 
-# Sincronizăm datele de pe GitHub chiar la rulare
 sincronizeaza_de_pe_github()
 
+# --- FUNCȚII PONTAJ ---
+def incarca_pontaj():
+    if os.path.exists(PONTAJ_FILE):
+        try:
+            with open(PONTAJ_FILE, "r") as f:
+                return json.load(f)
+        except: pass
+    return []
+
+def salveaza_pontaj(lista_pontaj):
+    with open(PONTAJ_FILE, "w") as f:
+        json.dump(lista_pontaj, f)
+    salveaza_fisier_pe_github(PONTAJ_FILE, "Actualizare pontaj")
+
 # --- FUNCȚII PERSISTENȚĂ SESIUNE ---
-def salveaza_sesiune(start, actual, lista):
+def salveaza_sesiune(start, actual, lista, tura_activa=None):
     with open(STATE_FILE, "w") as f:
-        json.dump({"start": start, "actual": actual, "lista": lista}, f)
-    salveaza_stare_pe_github(start, actual, lista)
+        json.dump({"start": start, "actual": actual, "lista": lista, "tura_activa": tura_activa}, f)
+    salveaza_stare_pe_github(start, actual, lista, tura_activa)
 
 def incarca_sesiune():
     stare_gh = incarca_stare_de_pe_github()
-    if stare_gh["actual"] > 0 or len(stare_gh["lista"]) > 0:
+    if stare_gh["actual"] > 0 or len(stare_gh["lista"]) > 0 or stare_gh["tura_activa"]:
         return stare_gh
 
     if os.path.exists(STATE_FILE):
@@ -123,10 +143,11 @@ def incarca_sesiune():
                 return {
                     "start": data.get("start", 0), 
                     "actual": data.get("actual", 0), 
-                    "lista": data.get("lista", [])
+                    "lista": data.get("lista", []),
+                    "tura_activa": data.get("tura_activa", None)
                 }
         except: pass
-    return {"start": 0, "actual": 0, "lista": []}
+    return {"start": 0, "actual": 0, "lista": [], "tura_activa": None}
 
 # --- FUNCȚII GESTIONARE PRODUSE ---
 def incarca_produse():
@@ -190,10 +211,55 @@ if 'produse_bonus' not in st.session_state:
 
 s = st.session_state['s_data']
 
+# --- VERIFICARE AUTOMATĂ: 12 ORE DE LA CHECK-IN ---
+if s.get('tura_activa'):
+    try:
+        timp_inceput = datetime.strptime(s['tura_activa'], "%Y-%m-%d %H:%M:%S")
+        timp_inceput = timp_inceput.replace(tzinfo=ZoneInfo("Europe/Bucharest"))
+        timp_acum = datetime.now(ZoneInfo("Europe/Bucharest"))
+        
+        # Dacă au trecut mai mult de 12 ore de la începerea turei
+        if timp_acum - timp_inceput >= timedelta(hours=12):
+            # 1. Calculăm raportul automat
+            t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
+            ora_ro = timp_acum.strftime('%d_%m_%Y_%H%M%S')
+            nume_fisier = f"raport_{OPERATOR_NUME}_{ora_ro}.txt"
+            continut_raport = f"{OPERATOR_NUME}|{s.get('actual', 0) - s.get('start', 0)}|{t_t}"
+            
+            # Salvăm raportul pe disc și pe GitHub
+            with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
+                f.write(continut_raport)
+            salveaza_fisier_pe_github(f"{DATA_DIR}/{nume_fisier}", continut_raport)
+            
+            # 2. Salvăm în pontaj că tura a durat exact 12 ore
+            timp_sfarsit = timp_inceput + timedelta(hours=12)
+            istoric_pontaj = incarca_pontaj()
+            istoric_pontaj.append({
+                "Operator": OPERATOR_NUME,
+                "Data": timp_inceput.strftime("%d.%m.%Y"),
+                "Check-in": timp_inceput.strftime("%H:%M"),
+                "Check-out": timp_sfarsit.strftime("%H:%M") + " (Auto 12h)",
+                "Total Ore": "12.0 ore"
+            })
+            salveaza_pontaj(istoric_pontaj)
+            
+            # 3. Resetăm sesiunea și starea curentă
+            s['start'] = 0
+            s['actual'] = 0
+            s['lista'] = []
+            s['tura_activa'] = None
+            salveaza_sesiune(0, 0, [], None)
+            
+            st.warning("⏰ Au trecut 12 ore! Tura a fost încheiată și salvată automat de sistem.")
+            st.rerun()
+    except:
+        pass
+
 # --- ORGANIZARE TAB-URI ---
-tab_livr, tab_disp, tab_centr, tab_admin = st.tabs([
+tab_livr, tab_disp, tab_pontaj, tab_centr, tab_admin = st.tabs([
     "🛵 Gestionare Livratori", 
     "⚙️ Dispecerat & Target", 
+    "🕐 Pontaj", 
     "📊 Centralizator", 
     "🛠️ Admin Produse"
 ])
@@ -234,7 +300,7 @@ with tab_disp:
     if start != s.get('start', 0) or actual != s.get('actual', 0):
         s['start'] = start
         s['actual'] = actual
-        salveaza_sesiune(s['start'], s['actual'], s['lista'])
+        salveaza_sesiune(s['start'], s['actual'], s['lista'], s.get('tura_activa'))
     
     st.info(f"✅ {actual - start} comenzi în total.")
     
@@ -258,8 +324,7 @@ with tab_disp:
             
             salveaza_fisier_pe_github(f"{DATA_DIR}/{nume_fisier}", continut_raport)
             
-            salveaza_sesiune(0, 0, [])
-            salveaza_stare_pe_github(0, 0, [])
+            salveaza_sesiune(0, 0, [], None)
             st.session_state['s_data'] = incarca_sesiune()
             st.success("Tura a fost închisă și salvată cu succes!")
             st.rerun()
@@ -273,12 +338,12 @@ with tab_disp:
                     for i in reversed(range(len(s['lista']))):
                         if s['lista'][i]['nume'] == produs:
                             del s['lista'][i]; break
-                    salveaza_sesiune(s['start'], s['actual'], s['lista'])
+                    salveaza_sesiune(s['start'], s['actual'], s['lista'], s.get('tura_activa'))
                     st.rerun()
                 if cols[2].button("➕", key=f"add_{produs}"):
                     ora = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H:%M")
                     s['lista'].append({"nume": produs, "val": float(val), "ora": ora})
-                    salveaza_sesiune(s['start'], s['actual'], s['lista'])
+                    salveaza_sesiune(s['start'], s['actual'], s['lista'], s.get('tura_activa'))
                     st.rerun()
             
             if s['lista']:
@@ -292,13 +357,72 @@ with tab_disp:
                     st.table(df_viz[cols_to_use])
                 st.write(f"### Total: {sum(float(i['val']) for i in s['lista']):.2f} lei")
                 if st.button("RESET TARGET"): 
-                    salveaza_sesiune(s['start'], s['actual'], [])
+                    salveaza_sesiune(s['start'], s['actual'], [], s.get('tura_activa'))
                     s['lista'] = []
-                    salveaza_stare_pe_github(s['start'], s['actual'], [])
                     st.rerun()
 
 # ==========================================
-# 3. TAB CENTRALIZATOR & EDITARE RAPOARTE
+# 3. TAB PONTAJ
+# ==========================================
+with tab_pontaj:
+    st.subheader("🕐 Sistem de Pontaj Operator")
+    
+    col_p1, col_p2 = st.columns(2)
+    
+    with col_p1:
+        if st.button("🟢 Începe Tura (Check-in)", use_container_width=True):
+             timp_acum = datetime.now(ZoneInfo("Europe/Bucharest"))
+             s['tura_activa'] = timp_acum.strftime("%Y-%m-%d %H:%M:%S")
+             salveaza_sesiune(s.get('start', 0), s.get('actual', 0), s.get('lista', []), s['tura_activa'])
+             st.success(f"Tura a început la ora {timp_acum.strftime('%H:%M:%S')}!")
+             st.rerun()
+
+    with col_p2:
+        if st.button("🔴 Încheie Tura (Check-out)", use_container_width=True):
+            if s.get('tura_activa'):
+                timp_sfarsit = datetime.now(ZoneInfo("Europe/Bucharest"))
+                timp_inceput = datetime.strptime(s['tura_activa'], "%Y-%m-%d %H:%M:%S")
+                timp_inceput = timp_inceput.replace(tzinfo=ZoneInfo("Europe/Bucharest"))
+                
+                diferenta = timp_sfarsit - timp_inceput
+                ore_lucrate = round(diferenta.total_seconds() / 3600, 2)
+                
+                istoric_pontaj = incarca_pontaj()
+                istoric_pontaj.append({
+                    "Operator": OPERATOR_NUME,
+                    "Data": timp_inceput.strftime("%d.%m.%Y"),
+                    "Check-in": timp_inceput.strftime("%H:%M"),
+                    "Check-out": timp_sfarsit.strftime("%H:%M"),
+                    "Total Ore": f"{ore_lucrate} ore"
+                })
+                salveaza_pontaj(istoric_pontaj)
+                
+                s['tura_activa'] = None
+                salveaza_sesiune(s.get('start', 0), s.get('actual', 0), s.get('lista', []), None)
+                st.success(f"Tura a fost încheiată! Ai lucrat {ore_lucrate} ore.")
+                st.rerun()
+            else:
+                st.warning("Nu ai nicio tură activă pornită!")
+
+    if s.get('tura_activa'):
+        st.info(f"🟢 **Tură activă în curs**, pornită la data și ora: `{s['tura_activa']}` (Se va închide automat după 12 ore)")
+
+    st.divider()
+    st.subheader("📋 Istoric Pontaj Ture")
+    istoric = incarca_pontaj()
+    if istoric:
+        df_pontaj = pd.DataFrame(istoric)
+        st.table(df_pontaj)
+        
+        if st.button("🗑️ Șterge tot istoricul de pontaj"):
+            salveaza_pontaj([])
+            st.success("Istoricul a fost șters!")
+            st.rerun()
+    else:
+        st.info("Nu există înregistrări în pontaj.")
+
+# ==========================================
+# 4. TAB CENTRALIZATOR & EDITARE RAPOARTE
 # ==========================================
 with tab_centr:
     st.subheader("📊 Analiză și Istoric Ture")
@@ -418,7 +542,7 @@ with tab_centr:
         st.info("Nu există rapoarte salvate încă. Finalizează o tură pentru a vizualiza centralizatorul.")
 
 # ==========================================
-# 4. TAB ADMINISTRARE PRODUSE
+# 5. TAB ADMINISTRARE PRODUSE
 # ==========================================
 with tab_admin:
     st.subheader("➕ Adaugă sau Actualizează Produs")

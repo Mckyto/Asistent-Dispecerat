@@ -264,7 +264,7 @@ tab_livr, tab_disp, tab_pontaj, tab_centr, tab_admin = st.tabs([
 ])
 
 # ==========================================
-# 1. TAB LIVRATORI (Căutare + Întrebare auto adăugare)
+# 1. TAB LIVRATORI
 # ==========================================
 with tab_livr:
     st.subheader("🛵 Căutare & Gestionare Livratori")
@@ -362,8 +362,9 @@ with tab_disp:
                     st.table(df_viz[cols_to_use])
                 st.write(f"### Total: {sum(float(i['val']) for i in s['lista']):.2f} lei")
                 if st.button("RESET TARGET"): 
-                    salveaza_sesiune(s['start'], s['actual'], [], s.get('tura_activa'))
                     s['lista'] = []
+                    salveaza_sesiune(s['start'], s['actual'], [], s.get('tura_activa'))
+                    st.success("Targetul a fost resetat!")
                     st.rerun()
 
 # ==========================================

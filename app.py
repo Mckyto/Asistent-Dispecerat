@@ -79,6 +79,20 @@ def salveaza_fisier_pe_github(path_fisier, mesaj_commit):
     except:
         return False
 
+def salveaza_text_pe_github(path_fisier, continut_text, mesaj_commit):
+    """Funcție specială pentru a urca text/CSV direct în memorie fără fișiere temporare locale."""
+    try:
+        g = Github(GITHUB_TOKEN_VAL)
+        repo = g.get_repo(GITHUB_REPO_VAL)
+        try:
+            file = repo.get_contents(path_fisier)
+            repo.update_file(path_fisier, mesaj_commit, continut_text, file.sha)
+        except:
+            repo.create_file(path_fisier, mesaj_commit, continut_text)
+        return True
+    except:
+        return False
+
 def salveaza_stare_pe_github(start, actual, lista, tura_activa=None):
     date_stare = {"start": start, "actual": actual, "lista": lista, "tura_activa": tura_activa}
     continut = json.dumps(date_stare)
@@ -557,13 +571,12 @@ with tab_centr:
             
         with col_dl2:
             if st.button("☁️ Salvează Centralizatorul (CSV) pe GitHub", use_container_width=True):
-                csv_path_temp = "centralizator_comenzi.csv"
-                df_export.to_csv(csv_path_temp, index=False, encoding='utf-8')
-                succes = salveaza_fisier_pe_github(csv_path_temp, "Actualizare centralizator CSV pe GitHub")
+                csv_string = df_export.to_csv(index=False, encoding='utf-8')
+                succes = salveaza_text_pe_github("centralizator_comenzi.csv", csv_string, "Actualizare centralizator CSV pe GitHub")
                 if succes:
                     st.success("Centralizatorul a fost urcat cu succes pe GitHub!")
                 else:
-                    st.error("A eșuat salvarea pe GitHub.")
+                    st.error("A eșuat salvarea pe GitHub. Verifică permisiunile token-ului.")
         
         st.divider()
         df_grafic = df_rapoarte.groupby("Data")["Comenzi"].sum().reset_index()

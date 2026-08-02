@@ -16,8 +16,8 @@ OPERATOR_NUME = "Operator"
 
 # Preluare sigură a secretelor de Telegram din Streamlit Secrets
 try:
-    TELEGRAM_TOKEN = st.secrets["8912058286:AAHbIXJizeKM5PivjSSa4tAuRESNoEvgHmw"]
-    TELEGRAM_CHAT_ID = st.secrets["8694128182"]
+    TELEGRAM_TOKEN = st.secrets["TELEGRAM_TOKEN"]
+    TELEGRAM_CHAT_ID = st.secrets["TELEGRAM_CHAT_ID"]
 except:
     TELEGRAM_TOKEN = ""
     TELEGRAM_CHAT_ID = ""
@@ -133,6 +133,18 @@ def sterge_livrator(nume_de_sters):
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
 
+# --- MENIU SIDEBAR PENTRU TESTARE BOT ---
+st.sidebar.header("🛠️ Setări & Teste")
+if st.sidebar.button("🧪 Testează Bot Telegram"):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        st.sidebar.error("Lipsesc TELEGRAM_TOKEN sau TELEGRAM_CHAT_ID din Streamlit Secrets!")
+    else:
+        rezultat = trimite_pe_telegram("🤖 *Test reușit!* Botul Presto funcționează perfect și este pregătit să trimită rapoarte.")
+        if rezultat:
+            st.sidebar.success("Mesajul de test a fost trimis pe Telegram!")
+        else:
+            st.sidebar.error("Eroare la trimitere. Verifică tokenul și Chat ID-ul din Secrets.")
+
 # --- INITIALIZARE SESSION STATE ---
 if 's_data' not in st.session_state:
     st.session_state['s_data'] = incarca_sesiune()
@@ -158,7 +170,6 @@ if s.get('tura_activa'):
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
             
-            # Trimite pe Telegram notificare auto 12h
             msg_tg = f"⏰ *Tura automată (12h) s-a încheiat!*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi: {comenzi_efectuate}\n🎯 Target: {t_t:.2f} lei"
             trimite_pe_telegram(msg_tg)
             
@@ -259,7 +270,6 @@ with tab_disp:
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
             
-            # Trimite pe Telegram la închiderea turei
             msg_tg = f"✅ *Tură încheiată cu succes!*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi: {comenzi_efectuate}\n🎯 Target: {t_t:.2f} lei"
             trimite_pe_telegram(msg_tg)
             

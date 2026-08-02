@@ -4,23 +4,14 @@ import pandas as pd
 import json
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from github import Github
 
-# --- CONFIGURARE FIȘIERE & SECRETE ---
+# --- CONFIGURARE FIȘIERE ---
 FILE_NAME = 'contacte.txt'
 PONTAJ_FILE = 'pontaj.json'
 DATA_DIR = "rapoarte_zilnice"
 STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
-
-# Preluare sigură a tokenului din Streamlit Secrets
-try:
-    GITHUB_TOKEN_VAL = st.secrets["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"]
-except:
-    GITHUB_TOKEN_VAL = "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"
-
-GITHUB_REPO_VAL = "Mckyto/predict"
 
 if not os.path.exists(DATA_DIR): 
     os.makedirs(DATA_DIR)
@@ -29,110 +20,6 @@ if not os.path.exists(FILE_NAME):
 if not os.path.exists(PONTAJ_FILE):
     with open(PONTAJ_FILE, "w") as f:
         json.dump([], f)
-
-# --- FUNCȚII GESTIONARE GITHUB (SYNC TOTAL) ---
-def sincronizeaza_de_pe_github():
-    """Descarcă automat de pe GitHub livratorii, produsele, pontajul și rapoartele la pornire."""
-    if not GITHUB_TOKEN_VAL: return
-    try:
-        g = Github(GITHUB_TOKEN_VAL)
-        repo = g.get_repo(GITHUB_REPO_VAL)
-        
-        try:
-            file_livr = repo.get_contents(FILE_NAME)
-            with open(FILE_NAME, "w") as f:
-                f.write(file_livr.decoded_content.decode('utf-8'))
-        except: pass
-
-        try:
-            file_prod = repo.get_contents(PRODUSE_FILE)
-            with open(PRODUSE_FILE, "w") as f:
-                f.write(file_prod.decoded_content.decode('utf-8'))
-        except: pass
-
-        try:
-            file_pontaj = repo.get_contents(PONTAJ_FILE)
-            with open(PONTAJ_FILE, "w") as f:
-                f.write(file_pontaj.decoded_content.decode('utf-8'))
-        except: pass
-
-        try:
-            contents = repo.get_contents(DATA_DIR)
-            for content_file in contents:
-                if content_file.name.startswith("raport_"):
-                    local_path = f"{DATA_DIR}/{content_file.name}"
-                    if not os.path.exists(local_path):
-                        with open(local_path, "w") as f:
-                            f.write(content_file.decoded_content.decode('utf-8'))
-        except: pass
-    except:
-        pass
-
-def salveaza_fisier_pe_github(path_fisier, mesaj_commit):
-    if not GITHUB_TOKEN_VAL: return False
-    try:
-        g = Github(GITHUB_TOKEN_VAL)
-        repo = g.get_repo(GITHUB_REPO_VAL)
-        with open(path_fisier, "r", encoding="utf-8") as f:
-            continut = f.read()
-        
-        try:
-            file = repo.get_contents(path_fisier)
-            repo.update_file(path_fisier, mesaj_commit, continut, file.sha)
-        except:
-            repo.create_file(path_fisier, mesaj_commit, continut)
-        return True
-    except:
-        return False
-
-def salveaza_text_pe_github(path_fisier, continut_text, mesaj_commit):
-    if not GITHUB_TOKEN_VAL: return False, "Lipsește tokenul în Streamlit Secrets"
-    try:
-        g = Github(GITHUB_TOKEN_VAL)
-        repo = g.get_repo(GITHUB_REPO_VAL)
-        try:
-            file = repo.get_contents(path_fisier)
-            repo.update_file(path_fisier, mesaj_commit, continut_text, file.sha)
-        except Exception:
-            repo.create_file(path_fisier, mesaj_commit, continut_text)
-        return True, "Succes"
-    except Exception as e:
-        return False, str(e)
-
-def salveaza_stare_pe_github(start, actual, lista, tura_activa=None):
-    if not GITHUB_TOKEN_VAL: return
-    date_stare = {"start": start, "actual": actual, "lista": lista, "tura_activa": tura_activa}
-    continut = json.dumps(date_stare)
-    try:
-        g = Github(GITHUB_TOKEN_VAL)
-        repo = g.get_repo(GITHUB_REPO_VAL)
-        path = "stare_curenta.json"
-        try:
-            file = repo.get_contents(path)
-            repo.update_file(path, "Auto-save stare curentă", continut, file.sha)
-        except:
-            repo.create_file(path, "Auto-save stare curentă", continut)
-    except:
-        pass
-
-def incarca_stare_de_pe_github():
-    if not GITHUB_TOKEN_VAL:
-        return {"start": 0, "actual": 0, "lista": [], "tura_activa": None}
-    try:
-        g = Github(GITHUB_TOKEN_VAL)
-        repo = g.get_repo(GITHUB_REPO_VAL)
-        file = repo.get_contents("stare_curenta.json")
-        data = json.loads(file.decoded_content.decode('utf-8'))
-        return {
-            "start": data.get("start", 0), 
-            "actual": data.get("actual", 0), 
-            "lista": data.get("lista", []),
-            "tura_activa": data.get("tura_activa", None)
-        }
-    except:
-        return {"start": 0, "actual": 0, "lista": [], "tura_activa": None}
-
-sincronizeaza_de_pe_github()
 
 # --- FUNCȚII PONTAJ ---
 def incarca_pontaj():
@@ -146,19 +33,13 @@ def incarca_pontaj():
 def salveaza_pontaj(lista_pontaj):
     with open(PONTAJ_FILE, "w") as f:
         json.dump(lista_pontaj, f)
-    salveaza_fisier_pe_github(PONTAJ_FILE, "Actualizare pontaj")
 
 # --- FUNCȚII PERSISTENȚĂ SESIUNE ---
 def salveaza_sesiune(start, actual, lista, tura_activa=None):
     with open(STATE_FILE, "w") as f:
         json.dump({"start": start, "actual": actual, "lista": lista, "tura_activa": tura_activa}, f)
-    salveaza_stare_pe_github(start, actual, lista, tura_activa)
 
 def incarca_sesiune():
-    stare_gh = incarca_stare_de_pe_github()
-    if stare_gh["actual"] > 0 or len(stare_gh["lista"]) > 0 or stare_gh["tura_activa"]:
-        return stare_gh
-
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE, "r") as f: 
@@ -197,13 +78,11 @@ def incarca_produse():
     }
     with open(PRODUSE_FILE, "w") as f:
         json.dump(produse_default, f)
-    salveaza_fisier_pe_github(PRODUSE_FILE, "Init produse default cu placinta de mere")
     return produse_default
 
 def salveaza_produse(produse_dict):
     with open(PRODUSE_FILE, "w") as f:
         json.dump(produse_dict, f)
-    salveaza_fisier_pe_github(PRODUSE_FILE, "Actualizare catalog produse")
 
 # --- FUNCȚII LIVRATORI ---
 def incarca_livratori():
@@ -215,7 +94,6 @@ def incarca_livratori():
 def salveaza_livrator_nou(nume):
     with open(FILE_NAME, "a") as f: 
         f.write(nume + "\n")
-    salveaza_fisier_pe_github(FILE_NAME, "Adăugare livrator nou")
 
 def sterge_livrator(nume_de_sters):
     lista = incarca_livratori()
@@ -224,19 +102,10 @@ def sterge_livrator(nume_de_sters):
         with open(FILE_NAME, "w") as f:
             for nume in lista: 
                 f.write(nume + "\n")
-        salveaza_fisier_pe_github(FILE_NAME, "Ștergere livrator")
 
 # --- INTERFAȚĂ PRINCIPALĂ ---
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
-
-# Buton în sidebar pentru sincronizare manuală imediată după un sleep
-if st.sidebar.button("🔄 Sincronizează cu GitHub"):
-    sincronizeaza_de_pe_github()
-    st.session_state['s_data'] = incarca_sesiune()
-    st.session_state['produse_bonus'] = incarca_produse()
-    st.success("S-a sincronizat cu succes!")
-    st.rerun()
 
 # --- INITIALIZARE SESSION STATE ---
 if 's_data' not in st.session_state:
@@ -262,7 +131,6 @@ if s.get('tura_activa'):
             
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
-            salveaza_fisier_pe_github(f"{DATA_DIR}/{nume_fisier}", continut_raport)
             
             timp_sfarsit = timp_inceput + timedelta(hours=12)
             istoric_pontaj = incarca_pontaj()
@@ -281,7 +149,7 @@ if s.get('tura_activa'):
             s['tura_activa'] = None
             salveaza_sesiune(0, 0, [], None)
             
-            st.warning("⏰ Au trecut 12 ore! Tura a fost încheiată și salvată automat de sistem.")
+            st.warning("⏰ Au trecut 12 ore! Tura a fost încheiată și salvată local de sistem.")
             st.rerun()
     except:
         pass
@@ -322,7 +190,7 @@ with tab_livr:
             st.warning(f"Livratorul **'{cautare.strip()}'** nu există în listă.")
             if st.button(f"➕ Adaugă-l pe '{cautare.strip()}' în baza de date"):
                 salveaza_livrator_nou(cautare.strip())
-                st.success(f"Livratorul {cautare.strip()} a fost adăugat și salvat permanent!")
+                st.success(f"Livratorul {cautare.strip()} a fost adăugat cu succes!")
                 st.rerun()
     else:
         st.info("Introdu un nume în căsuța de sus pentru a verifica sau găsi un livrator.")
@@ -360,8 +228,6 @@ with tab_disp:
             
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
-            
-            salveaza_fisier_pe_github(f"{DATA_DIR}/{nume_fisier}", continut_raport)
             
             salveaza_sesiune(0, 0, [], None)
             st.session_state['s_data'] = incarca_sesiune()
@@ -569,25 +435,13 @@ with tab_centr:
         df_export = df_rapoarte[['Data', 'Comenzi', 'Target']].copy()
         csv_data = df_export.to_csv(index=False).encode('utf-8')
         
-        col_dl1, col_dl2 = st.columns(2)
-        
-        with col_dl1:
-            st.download_button(
-                label="📥 Descarcă Centralizator (CSV) pe dispozitiv",
-                data=csv_data,
-                file_name="raport_comenzi_presto.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-            
-        with col_dl2:
-            if st.button("☁️ Salvează Centralizatorul (CSV) pe GitHub", use_container_width=True):
-                csv_string = df_export.to_csv(index=False, encoding='utf-8')
-                succes, mesaj_eroare = salveaza_text_pe_github("centralizator_comenzi.csv", csv_string, "Actualizare centralizator CSV pe GitHub")
-                if succes:
-                    st.success("Centralizatorul a fost urcat cu succes pe GitHub!")
-                else:
-                    st.error(f"A eșuat salvarea pe GitHub: {mesaj_eroare}")
+        st.download_button(
+            label="📥 Descarcă Centralizator (CSV) pe dispozitiv",
+            data=csv_data,
+            file_name="raport_comenzi_presto.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
         
         st.divider()
         df_grafic = df_rapoarte.groupby("Data")["Comenzi"].sum().reset_index()
@@ -606,12 +460,6 @@ with tab_centr:
                 
                 if c_del.button("❌ Șterge", key=f"del_{rand['Fișier']}"): 
                     os.remove(f"{DATA_DIR}/{rand['Fișier']}")
-                    try:
-                        g = Github(GITHUB_TOKEN_VAL)
-                        repo = g.get_repo(GITHUB_REPO_VAL)
-                        file_gh = repo.get_contents(f"{DATA_DIR}/{rand['Fișier']}")
-                        repo.delete_file(file_gh.path, "Ștergere raport", file_gh.sha)
-                    except: pass
                     st.rerun()
                 
                 if editeaza_apasat:
@@ -641,18 +489,10 @@ with tab_centr:
                             if rand['Fișier'] != nume_nou_fisier:
                                 if os.path.exists(f"{DATA_DIR}/{rand['Fișier']}"):
                                     os.remove(f"{DATA_DIR}/{rand['Fișier']}")
-                                try:
-                                    g = Github(GITHUB_TOKEN_VAL)
-                                    repo = g.get_repo(GITHUB_REPO_VAL)
-                                    file_gh = repo.get_contents(f"{DATA_DIR}/{rand['Fișier']}")
-                                    repo.delete_file(file_gh.path, "Ștergere fișier vechi la editare", file_gh.sha)
-                                except: pass
                             
                             continut_nou = f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}"
                             with open(f"{DATA_DIR}/{nume_nou_fisier}", "w") as f_out:
                                 f_out.write(continut_nou)
-                                
-                            salveaza_fisier_pe_github(f"{DATA_DIR}/{nume_nou_fisier}", continut_nou)
                                 
                             st.session_state[f"is_editing_{rand['Fișier']}"] = False
                             st.success("Modificat cu succes!")

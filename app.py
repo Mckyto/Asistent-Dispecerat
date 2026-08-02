@@ -544,13 +544,26 @@ with tab_centr:
         df_export = df_rapoarte[['Data', 'Comenzi', 'Target']].copy()
         csv_data = df_export.to_csv(index=False).encode('utf-8')
         
-        st.download_button(
-            label="📥 Descarcă Centralizator (CSV)",
-            data=csv_data,
-            file_name="raport_comenzi_presto.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+        col_dl1, col_dl2 = st.columns(2)
+        
+        with col_dl1:
+            st.download_button(
+                label="📥 Descarcă Centralizator (CSV) pe dispozitiv",
+                data=csv_data,
+                file_name="raport_comenzi_presto.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+            
+        with col_dl2:
+            if st.button("☁️ Salvează Centralizatorul (CSV) pe GitHub", use_container_width=True):
+                csv_path_temp = "centralizator_comenzi.csv"
+                df_export.to_csv(csv_path_temp, index=False, encoding='utf-8')
+                succes = salveaza_fisier_pe_github(csv_path_temp, "Actualizare centralizator CSV pe GitHub")
+                if succes:
+                    st.success("Centralizatorul a fost urcat cu succes pe GitHub!")
+                else:
+                    st.error("A eșuat salvarea pe GitHub.")
         
         st.divider()
         df_grafic = df_rapoarte.groupby("Data")["Comenzi"].sum().reset_index()

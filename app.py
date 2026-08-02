@@ -16,7 +16,7 @@ OPERATOR_NUME = "Operator"
 
 # Preluare sigură a tokenului din Streamlit Secrets
 try:
-    GITHUB_TOKEN_VAL = st.secrets["GITHUB_TOKEN"]
+    GITHUB_TOKEN_VAL = st.secrets["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"]
 except:
     GITHUB_TOKEN_VAL = "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"
 

@@ -207,6 +207,14 @@ def sterge_livrator(nume_de_sters):
 st.set_page_config(page_title="Asistent Presto", page_icon="🍕", layout="wide")
 st.title("🍕 Asistent Dispecerat Presto")
 
+# Buton în sidebar pentru sincronizare manuală imediată după un sleep
+if st.sidebar.button("🔄 Sincronizează cu GitHub"):
+    sincronizeaza_de_pe_github()
+    st.session_state['s_data'] = incarca_sesiune()
+    st.session_state['produse_bonus'] = incarca_produse()
+    st.success("S-a sincronizat cu succes!")
+    st.rerun()
+
 # --- INITIALIZARE SESSION STATE ---
 if 's_data' not in st.session_state:
     st.session_state['s_data'] = incarca_sesiune()
@@ -254,7 +262,7 @@ if s.get('tura_activa'):
     except:
         pass
 
-# --- ORGANIZARE TAB-URI (Inclusiv Calculator Procent) ---
+# --- ORGANIZARE TAB-URI ---
 tab_livr, tab_disp, tab_calc, tab_pontaj, tab_centr, tab_admin = st.tabs([
     "🛵 Gestionare Livratori", 
     "⚙️ Dispecerat & Target", 

@@ -2,16 +2,25 @@ import streamlit as st
 import os
 import pandas as pd
 import json
+import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-# --- CONFIGURARE FIȘIERE ---
+# --- CONFIGURARE FIȘIERE & SECRETE ---
 FILE_NAME = 'contacte.txt'
 PONTAJ_FILE = 'pontaj.json'
 DATA_DIR = "rapoarte_zilnice"
 STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
+
+# Preluare sigură a secretelor de Telegram din Streamlit Secrets
+try:
+    TELEGRAM_TOKEN = st.secrets["8912058286:AAHbIXJizeKM5PivjSSa4tAuRESNoEvgHmw"]
+    TELEGRAM_CHAT_ID = st.secrets["8694128182"]
+except:
+    TELEGRAM_TOKEN = ""
+    TELEGRAM_CHAT_ID = ""
 
 if not os.path.exists(DATA_DIR): 
     os.makedirs(DATA_DIR)
@@ -20,6 +29,23 @@ if not os.path.exists(FILE_NAME):
 if not os.path.exists(PONTAJ_FILE):
     with open(PONTAJ_FILE, "w") as f:
         json.dump([], f)
+
+# --- FUNCȚIE TRIMITERE TELEGRAM ---
+def trimite_pe_telegram(mesaj):
+    """Trimite notificări text instant pe Telegram."""
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        return False
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": mesaj,
+        "parse_mode": "Markdown"
+    }
+    try:
+        response = requests.post(url, json=payload, timeout=5)
+        return response.status_code == 200
+    except:
+        return False
 
 # --- FUNCȚII PONTAJ ---
 def incarca_pontaj():
@@ -132,6 +158,10 @@ if s.get('tura_activa'):
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
             
+            # Trimite pe Telegram notificare auto 12h
+            msg_tg = f"⏰ *Tura automată (12h) s-a încheiat!*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi: {comenzi_efectuate}\n🎯 Target: {t_t:.2f} lei"
+            trimite_pe_telegram(msg_tg)
+            
             timp_sfarsit = timp_inceput + timedelta(hours=12)
             istoric_pontaj = incarca_pontaj()
             istoric_pontaj.append({
@@ -149,7 +179,7 @@ if s.get('tura_activa'):
             s['tura_activa'] = None
             salveaza_sesiune(0, 0, [], None)
             
-            st.warning("⏰ Au trecut 12 ore! Tura a fost încheiată și salvată local de sistem.")
+            st.warning("⏰ Au trecut 12 ore! Tura a fost încheiată și trimisă pe Telegram.")
             st.rerun()
     except:
         pass
@@ -229,9 +259,13 @@ with tab_disp:
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
             
+            # Trimite pe Telegram la închiderea turei
+            msg_tg = f"✅ *Tură încheiată cu succes!*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi: {comenzi_efectuate}\n🎯 Target: {t_t:.2f} lei"
+            trimite_pe_telegram(msg_tg)
+            
             salveaza_sesiune(0, 0, [], None)
             st.session_state['s_data'] = incarca_sesiune()
-            st.success("Tura a fost încheiată și salvată cu succes!")
+            st.success("Tura a fost încheiată, salvată și trimisă pe Telegram!")
             st.rerun()
 
     with c2:

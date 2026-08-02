@@ -14,11 +14,11 @@ STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
 
-# Preluare sigură a tokenului din Streamlit Secrets (fără a-l mai expune în cod)
+# Preluare sigură a tokenului din Streamlit Secrets
 try:
-    GITHUB_TOKEN_VAL = st.secrets["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"]
+    GITHUB_TOKEN_VAL = st.secrets["GITHUB_TOKEN"]
 except:
-    GITHUB_TOKEN_VAL = ""  # Fallback dacă rulează local fără secrets.toml
+    GITHUB_TOKEN_VAL = "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"
 
 GITHUB_REPO_VAL = "Mckyto/predict"
 
@@ -33,8 +33,7 @@ if not os.path.exists(PONTAJ_FILE):
 # --- FUNCȚII GESTIONARE GITHUB (SYNC TOTAL) ---
 def sincronizeaza_de_pe_github():
     """Descarcă automat de pe GitHub livratorii, produsele, pontajul și rapoartele la pornire."""
-    if not GITHUB_TOKEN_VAL:
-        return
+    if not GITHUB_TOKEN_VAL: return
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
@@ -255,10 +254,11 @@ if s.get('tura_activa'):
         timp_acum = datetime.now(ZoneInfo("Europe/Bucharest"))
         
         if timp_acum - timp_inceput >= timedelta(hours=12):
+            comenzi_efectuate = s.get('actual', 0) - s.get('start', 0)
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
             ora_ro = timp_acum.strftime('%d_%m_%Y_%H%M%S')
             nume_fisier = f"raport_{OPERATOR_NUME}_{ora_ro}.txt"
-            continut_raport = f"{OPERATOR_NUME}|{s.get('actual', 0) - s.get('start', 0)}|{t_t}"
+            continut_raport = f"{OPERATOR_NUME}|{comenzi_efectuate}|{t_t}"
             
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
@@ -352,10 +352,11 @@ with tab_disp:
                 st.success(f"Diferență: {diferenta:.2f} lei")
 
         if st.button("💾 Salvează și Închide Tura"):
+            comenzi_efectuate = actual - start
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
             ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
             nume_fisier = f"raport_{OPERATOR_NUME}_{ora_ro}.txt"
-            continut_raport = f"{OPERATOR_NUME}|{actual - start}|{t_t}"
+            continut_raport = f"{OPERATOR_NUME}|{comenzi_efectuate}|{t_t}"
             
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
@@ -586,7 +587,7 @@ with tab_centr:
                 if succes:
                     st.success("Centralizatorul a fost urcat cu succes pe GitHub!")
                 else:
-                    st.error(f"A eșuat salvarea. Eroarea primită de la GitHub este: {mesaj_eroare}")
+                    st.error(f"A eșuat salvarea pe GitHub: {mesaj_eroare}")
         
         st.divider()
         df_grafic = df_rapoarte.groupby("Data")["Comenzi"].sum().reset_index()

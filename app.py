@@ -14,8 +14,12 @@ STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
 
-# Token-ul tău Classic de GitHub
-GITHUB_TOKEN_VAL = "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"
+# Preluare sigură a tokenului din Streamlit Secrets (fără a-l mai expune în cod)
+try:
+    GITHUB_TOKEN_VAL = st.secrets["GITHUB_TOKEN"]
+except:
+    GITHUB_TOKEN_VAL = ""  # Fallback dacă rulează local fără secrets.toml
+
 GITHUB_REPO_VAL = "Mckyto/predict"
 
 if not os.path.exists(DATA_DIR): 
@@ -29,6 +33,8 @@ if not os.path.exists(PONTAJ_FILE):
 # --- FUNCȚII GESTIONARE GITHUB (SYNC TOTAL) ---
 def sincronizeaza_de_pe_github():
     """Descarcă automat de pe GitHub livratorii, produsele, pontajul și rapoartele la pornire."""
+    if not GITHUB_TOKEN_VAL:
+        return
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
@@ -64,6 +70,7 @@ def sincronizeaza_de_pe_github():
         pass
 
 def salveaza_fisier_pe_github(path_fisier, mesaj_commit):
+    if not GITHUB_TOKEN_VAL: return False
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
@@ -80,7 +87,7 @@ def salveaza_fisier_pe_github(path_fisier, mesaj_commit):
         return False
 
 def salveaza_text_pe_github(path_fisier, continut_text, mesaj_commit):
-    """Creează sau actualizează automat un fișier text/CSV pe GitHub și returnează starea exactă."""
+    if not GITHUB_TOKEN_VAL: return False, "Lipsește tokenul în Streamlit Secrets"
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
@@ -94,6 +101,7 @@ def salveaza_text_pe_github(path_fisier, continut_text, mesaj_commit):
         return False, str(e)
 
 def salveaza_stare_pe_github(start, actual, lista, tura_activa=None):
+    if not GITHUB_TOKEN_VAL: return
     date_stare = {"start": start, "actual": actual, "lista": lista, "tura_activa": tura_activa}
     continut = json.dumps(date_stare)
     try:
@@ -109,6 +117,8 @@ def salveaza_stare_pe_github(start, actual, lista, tura_activa=None):
         pass
 
 def incarca_stare_de_pe_github():
+    if not GITHUB_TOKEN_VAL:
+        return {"start": 0, "actual": 0, "lista": [], "tura_activa": None}
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)

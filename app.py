@@ -14,8 +14,8 @@ STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
 
-# Noul tău token de GitHub cu permisiuni complete
-GITHUB_TOKEN_VAL = "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"
+# Noul tău token Classic de GitHub cu permisiuni complete (repo)
+GITHUB_TOKEN_VAL = "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"
 GITHUB_REPO_VAL = "Mckyto/predict"
 
 if not os.path.exists(DATA_DIR): 

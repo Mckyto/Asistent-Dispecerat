@@ -15,7 +15,7 @@ PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
 
 # Token-ul tău Classic de GitHub
-GITHUB_TOKEN_VAL = "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"
+GITHUB_TOKEN_VAL = "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"
 GITHUB_REPO_VAL = "Mckyto/predict"
 
 if not os.path.exists(DATA_DIR): 

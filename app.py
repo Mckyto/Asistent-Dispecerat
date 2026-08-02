@@ -14,7 +14,7 @@ STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
 
-# Noul tău token Classic de GitHub cu permisiuni complete (repo)
+# Token-ul tău Classic de GitHub
 GITHUB_TOKEN_VAL = "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"
 GITHUB_REPO_VAL = "Mckyto/predict"
 
@@ -80,7 +80,7 @@ def salveaza_fisier_pe_github(path_fisier, mesaj_commit):
         return False
 
 def salveaza_text_pe_github(path_fisier, continut_text, mesaj_commit):
-    """Funcție specială pentru a urca text/CSV direct în memorie fără fișiere temporare locale."""
+    """Creează sau actualizează automat un fișier text/CSV pe GitHub."""
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)

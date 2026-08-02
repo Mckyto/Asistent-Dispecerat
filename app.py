@@ -14,8 +14,8 @@ STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
 
-# Datele tale de GitHub integrate direct
-GITHUB_TOKEN_VAL = "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"
+# Noul tău token de GitHub cu permisiuni complete
+GITHUB_TOKEN_VAL = "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"
 GITHUB_REPO_VAL = "Mckyto/predict"
 
 if not os.path.exists(DATA_DIR): 
@@ -576,7 +576,7 @@ with tab_centr:
                 if succes:
                     st.success("Centralizatorul a fost urcat cu succes pe GitHub!")
                 else:
-                    st.error("A eșuat salvarea pe GitHub. Verifică permisiunile token-ului.")
+                    st.error("A eșuat salvarea pe GitHub.")
         
         st.divider()
         df_grafic = df_rapoarte.groupby("Data")["Comenzi"].sum().reset_index()

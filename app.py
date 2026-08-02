@@ -80,18 +80,18 @@ def salveaza_fisier_pe_github(path_fisier, mesaj_commit):
         return False
 
 def salveaza_text_pe_github(path_fisier, continut_text, mesaj_commit):
-    """Creează sau actualizează automat un fișier text/CSV pe GitHub."""
+    """Creează sau actualizează automat un fișier text/CSV pe GitHub și returnează starea exactă."""
     try:
         g = Github(GITHUB_TOKEN_VAL)
         repo = g.get_repo(GITHUB_REPO_VAL)
         try:
             file = repo.get_contents(path_fisier)
             repo.update_file(path_fisier, mesaj_commit, continut_text, file.sha)
-        except:
+        except Exception:
             repo.create_file(path_fisier, mesaj_commit, continut_text)
-        return True
-    except:
-        return False
+        return True, "Succes"
+    except Exception as e:
+        return False, str(e)
 
 def salveaza_stare_pe_github(start, actual, lista, tura_activa=None):
     date_stare = {"start": start, "actual": actual, "lista": lista, "tura_activa": tura_activa}
@@ -572,11 +572,11 @@ with tab_centr:
         with col_dl2:
             if st.button("☁️ Salvează Centralizatorul (CSV) pe GitHub", use_container_width=True):
                 csv_string = df_export.to_csv(index=False, encoding='utf-8')
-                succes = salveaza_text_pe_github("centralizator_comenzi.csv", csv_string, "Actualizare centralizator CSV pe GitHub")
+                succes, mesaj_eroare = salveaza_text_pe_github("centralizator_comenzi.csv", csv_string, "Actualizare centralizator CSV pe GitHub")
                 if succes:
                     st.success("Centralizatorul a fost urcat cu succes pe GitHub!")
                 else:
-                    st.error("A eșuat salvarea pe GitHub.")
+                    st.error(f"A eșuat salvarea. Eroarea primită de la GitHub este: {mesaj_eroare}")
         
         st.divider()
         df_grafic = df_rapoarte.groupby("Data")["Comenzi"].sum().reset_index()

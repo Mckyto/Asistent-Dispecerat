@@ -16,7 +16,7 @@ OPERATOR_NUME = "Operator"
 
 # Preluare sigură a tokenului din Streamlit Secrets (fără a-l mai expune în cod)
 try:
-    GITHUB_TOKEN_VAL = st.secrets["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"]
+    GITHUB_TOKEN_VAL = st.secrets["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"]
 except:
     GITHUB_TOKEN_VAL = ""  # Fallback dacă rulează local fără secrets.toml
 

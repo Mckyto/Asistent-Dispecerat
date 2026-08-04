@@ -1,0 +1,14 @@
+name: Keep Streamlit Alive
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit App
+        run: |
+          curl -I https://predict-a9g9znwhduuvcawstsiex6.streamlit.app/

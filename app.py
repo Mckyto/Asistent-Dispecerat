@@ -30,7 +30,7 @@ if not os.path.exists(PONTAJ_FILE):
     with open(PONTAJ_FILE, "w") as f:
         json.dump([], f)
 
-# --- FUNCȚII TRIMITERE TELEGRAM ---
+# --- FUNCȚIE TRIMITERE TELEGRAM ---
 def trimite_pe_telegram(mesaj):
     """Trimite notificări text instant pe Telegram."""
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
@@ -43,19 +43,6 @@ def trimite_pe_telegram(mesaj):
     }
     try:
         response = requests.post(url, json=payload, timeout=5)
-        return response.status_code == 200
-    except:
-        return False
-
-def trimite_fisier_pe_telegram(file_bytes, file_name, caption=""):
-    """Trimite un fișier (document CSV) direct pe Telegram."""
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        return False
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendDocument"
-    files = {'document': (file_name, file_bytes)}
-    data = {'chat_id': TELEGRAM_CHAT_ID, 'caption': caption}
-    try:
-        response = requests.post(url, data=data, files=files, timeout=10)
         return response.status_code == 200
     except:
         return False
@@ -152,7 +139,7 @@ if st.sidebar.button("🧪 Testează Bot Telegram"):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         st.sidebar.error("Lipsesc TELEGRAM_TOKEN sau TELEGRAM_CHAT_ID din Streamlit Secrets!")
     else:
-        rezultat = trimite_pe_telegram("🤖 *Test reușit!* Botul Presto este activ și pregătit să trimită fișierele și rapoartele.")
+        rezultat = trimite_pe_telegram("🤖 *Test reușit!* Botul Presto este activ și pregătit să trimită centralizatorul.")
         if rezultat:
             st.sidebar.success("Mesajul de test a fost trimis pe Telegram!")
         else:
@@ -518,16 +505,21 @@ with tab_centr:
         st.divider()
         df_rapoarte = pd.DataFrame(date_rapoarte)
         
-        df_export = df_rapoarte[['Data', 'Comenzi', 'Target']].copy()
-        csv_bytes = df_export.to_csv(index=False).encode('utf-8')
-        
-        # Buton pentru trimiterea fișierului CSV direct pe Telegram
-        if st.button("📥 Trimite Centralizatorul (CSV) pe Telegram", use_container_width=True):
-            succes_tg = trimite_fisier_pe_telegram(csv_bytes, "raport_comenzi_presto.csv", caption="📊 *Centralizatorul tău de comenzi (CSV)*")
+        # Buton pentru trimiterea textului complet al centralizatorului pe Telegram
+        if st.button("📤 Trimite Centralizatorul pe Telegram", use_container_width=True):
+            mesaj_centralizator = f"📊 *CENTRALIZATOR COMENZI PRESTO*\n\n"
+            mesaj_centralizator += f"📦 *Total Comenzi:* {total_com}\n"
+            mesaj_centralizator += f"🎯 *Total Target:* {total_tgt:.2f} lei\n\n"
+            mesaj_centralizator += "📋 *Istoric Ture:*\n"
+            
+            for r in date_rapoarte:
+                mesaj_centralizator += f"• Data: {r['Data']} | Comenzi: {r['Comenzi']} | Target: {r['Target']:.2f} lei\n"
+            
+            succes_tg = trimite_pe_telegram(mesaj_centralizator)
             if succes_tg:
-                st.success("Centralizatorul a fost trimis cu succes pe Telegram!")
+                st.success("Centralizatorul a fost trimis cu succes pe Telegram sub formă de text!")
             else:
-                st.error("A eșuat trimiterea fișierului. Verifică tokenul și Chat ID-ul din Secrets.")
+                st.error("A eșuat trimiterea. Verifică datele din Secrets.")
         
         st.divider()
         df_grafic = df_rapoarte.groupby("Data")["Comenzi"].sum().reset_index()

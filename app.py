@@ -139,11 +139,11 @@ if st.sidebar.button("🧪 Testează Bot Telegram"):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         st.sidebar.error("Lipsesc TELEGRAM_TOKEN sau TELEGRAM_CHAT_ID din Streamlit Secrets!")
     else:
-        rezultat = trimite_pe_telegram("🤖 *Test reușit!* Botul Presto funcționează perfect și este pregătit să trimită rapoarte.")
+        rezultat = trimite_pe_telegram("🤖 *Test reușit!* Botul Presto este activ și pregătit să trimită toate acțiunile tale.")
         if rezultat:
             st.sidebar.success("Mesajul de test a fost trimis pe Telegram!")
         else:
-            st.sidebar.error("Eroare la trimitere. Verifică tokenul și Chat ID-ul din Secrets.")
+            st.sidebar.error("Eroare la trimitere. Verifică datele din Secrets.")
 
 # --- INITIALIZARE SESSION STATE ---
 if 's_data' not in st.session_state:
@@ -170,7 +170,7 @@ if s.get('tura_activa'):
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
             
-            msg_tg = f"⏰ *Tura automată (12h) s-a încheiat!*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi: {comenzi_efectuate}\n🎯 Target: {t_t:.2f} lei"
+            msg_tg = f"⏰ *Tura automată (12h) s-a încheiat!*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi totale: {comenzi_efectuate}\n🎯 Target total: {t_t:.2f} lei"
             trimite_pe_telegram(msg_tg)
             
             timp_sfarsit = timp_inceput + timedelta(hours=12)
@@ -248,6 +248,8 @@ with tab_disp:
         s['start'] = start
         s['actual'] = actual
         salveaza_sesiune(s['start'], s['actual'], s['lista'], s.get('tura_activa'))
+        comenzi_curente = actual - start
+        trimite_pe_telegram(f"📊 *Actualizare Comenzi*\n📦 Comenzi efectuate: *{comenzi_curente}* (Start: {start}, Actual: {actual})")
     
     st.info(f"✅ {actual - start} comenzi în total.")
     
@@ -270,7 +272,7 @@ with tab_disp:
             with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
                 f.write(continut_raport)
             
-            msg_tg = f"✅ *Tură încheiată cu succes!*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi: {comenzi_efectuate}\n🎯 Target: {t_t:.2f} lei"
+            msg_tg = f"✅ *Tură încheiată și salvată!*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi totale: {comenzi_efectuate}\n🎯 Target total acumulat: {t_t:.2f} lei"
             trimite_pe_telegram(msg_tg)
             
             salveaza_sesiune(0, 0, [], None)
@@ -286,12 +288,22 @@ with tab_disp:
                 if cols[1].button("➖", key=f"sub_{produs}"):
                     for i in reversed(range(len(s['lista']))):
                         if s['lista'][i]['nume'] == produs:
-                            del s['lista'][i]; break
+                            nume_sters = s['lista'][i]['nume']
+                            val_stearsa = s['lista'][i]['val']
+                            del s['lista'][i]
+                            
+                            t_total_nou = sum(float(item['val']) for item in s['lista'])
+                            trimite_pe_telegram(f"❌ *S-a scos un produs din Target*\n➖ Produs: {nume_sters} (-{val_stearsa} lei)\n💰 Total nou target: *{t_total_nou:.2f} lei*")
+                            break
                     salveaza_sesiune(s['start'], s['actual'], s['lista'], s.get('tura_activa'))
                     st.rerun()
                 if cols[2].button("➕", key=f"add_{produs}"):
                     ora = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H:%M")
                     s['lista'].append({"nume": produs, "val": float(val), "ora": ora})
+                    
+                    t_total_nou = sum(float(item['val']) for item in s['lista'])
+                    trimite_pe_telegram(f"➕ *Produs nou adăugat în Target*\n🛍️ Produs: *{produs}* (+{val} lei)\n⏰ Ora: {ora}\n💰 Total nou target: *{t_total_nou:.2f} lei*")
+                    
                     salveaza_sesiune(s['start'], s['actual'], s['lista'], s.get('tura_activa'))
                     st.rerun()
             
@@ -308,6 +320,7 @@ with tab_disp:
                 if st.button("RESET TARGET"): 
                     s['lista'] = []
                     salveaza_sesiune(s['start'], s['actual'], [], s.get('tura_activa'))
+                    trimite_pe_telegram("🗑️ *Targetul a fost resetat la 0!*")
                     st.success("Targetul a fost resetat!")
                     st.rerun()
 
@@ -376,6 +389,7 @@ with tab_pontaj:
              timp_acum = datetime.now(ZoneInfo("Europe/Bucharest"))
              s['tura_activa'] = timp_acum.strftime("%Y-%m-%d %H:%M:%S")
              salveaza_sesiune(s.get('start', 0), s.get('actual', 0), s.get('lista', []), s['tura_activa'])
+             trimite_pe_telegram(f"🟢 *Check-in efectuat*\nTura a început la ora: `{timp_acum.strftime('%H:%M:%S')}`")
              st.success(f"Tura a început la ora {timp_acum.strftime('%H:%M:%S')}!")
              st.rerun()
 
@@ -398,6 +412,8 @@ with tab_pontaj:
                     "Total Ore": f"{ore_lucrate} ore"
                 })
                 salveaza_pontaj(istoric_pontaj)
+                
+                trimite_pe_telegram(f"🔴 *Check-out efectuat*\nTura s-a încheiat. Total ore lucrate: *{ore_lucrate} ore*")
                 
                 s['tura_activa'] = None
                 salveaza_sesiune(s.get('start', 0), s.get('actual', 0), s.get('lista', []), None)
@@ -429,6 +445,31 @@ with tab_pontaj:
 with tab_centr:
     st.subheader("📊 Analiză, Istoric Ture & Pondere Produse")
     
+    # --- ZONĂ ADĂUGARE RAPORT MANUAL (Când se pierde din cauza sleep-ului) ---
+    with st.expander("➕ Adaugă Manual un Raport Pierdut (Recuperare)", expanded=False):
+        st.write("Introdu detaliile unei ture anterioare pierdute pentru a o readăuga în centralizator:")
+        with st.form("formular_raport_manual"):
+            data_manuala = st.date_input("Data raportului:", value=datetime.now(ZoneInfo("Europe/Bucharest")))
+            comenzi_manuale = st.number_input("Număr comenzi:", min_value=0, value=10, step=1)
+            target_manual = st.number_input("Valoare target (lei):", min_value=0.0, value=50.0, step=0.5, format="%.2f")
+            
+            buton_salvare_manual = st.form_submit_button("💾 Salvează Raportul în Istoric")
+            if buton_salvare_manual:
+                z_str = data_manuala.strftime("%d")
+                l_str = data_manuala.strftime("%m")
+                a_str = data_manuala.strftime("%Y")
+                ora_unika = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H%M%S")
+                
+                nume_fisier_manual = f"raport_{OPERATOR_NUME}_{z_str}_{l_str}_{a_str}_{ora_unika}.txt"
+                continut_manual = f"{OPERATOR_NUME}|{comenzi_manuale}|{target_manual}"
+                
+                with open(f"{DATA_DIR}/{nume_fisier_manual}", "w") as f:
+                    f.write(continut_manual)
+                
+                trimite_pe_telegram(f"📝 *Raport adăugat manual*\n📅 Data: {data_manuala.strftime('%d.%m.%Y')}\n📦 Comenzi: {comenzi_manuale}\n🎯 Target: {target_manual:.2f} lei")
+                st.success("Raportul a fost adăugat cu succes în centralizator!")
+                st.rerun()
+
     if s['lista']:
         st.markdown("### 📈 Ponderea produselor în targetul turei curente")
         df_curent = pd.DataFrame(s['lista'])
@@ -546,7 +587,7 @@ with tab_centr:
                             st.session_state[f"is_editing_{rand['Fișier']}"] = False
                             st.rerun()
     else:
-        st.info("Nu există rapoarte salvate încă. Finalizează o tură pentru a vizualiza centralizatorul.")
+        st.info("Nu există rapoarte salvate încă. Finalizează o tură sau adaugă un raport manual mai sus.")
 
 # ==========================================
 # 6. TAB ADMINISTRARE PRODUSE

@@ -1,49 +1,14 @@
-import os
-import requests
-from dotenv import load_dotenv
+name: Keep Streamlit Alive
 
-# Încarcă variabilele din .env dacă rulezi local pe calculator
-load_dotenv()
+on:
+  schedule:
+    - cron: '0 */4 * * *' # Rulează la fiecare 4 ore
+  workflow_dispatch: # Îți permite să îl pornești și manual
 
-# Preluare setări Telegram din mediu
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-def send_telegram_message(message):
-    """Trimite notificări pe Telegram dacă tokenul și chat ID-ul sunt setate."""
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        print("⚠️ Telegram token sau chat ID lipsesc din variabilele de mediu!")
-        return
-    
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown"
-    }
-    
-    try:
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            print("✅ Mesaj trimis cu succes pe Telegram!")
-        else:
-            print(f"❌ Eroare la trimiterea pe Telegram: {response.text}")
-    except Exception as e:
-        print(f"❌ Excepție la conexiunea cu Telegram: {e}")
-
-def main():
-    print("🚀 Scriptul a început execuția pe server...")
-    
-    # --- AICI ADAUGI LOGICA TA DE PREDICȚIE SAU PROCESARE ---
-    # Exemplu:
-    rezultat = "Predicția/Procesarea datelor s-a finalizat cu succes."
-    print(f"📊 {rezultat}")
-    
-    # Notificare opțională trimisă automat
-    mesaj_final = f"*Raport Automat GitHub Actions*\n\n{rezultat}"
-    send_telegram_message(mesaj_final)
-    
-    print("🏁 Scriptul s-a încheiat cu bine!")
-
-if __name__ == "__main__":
-    main()
+jobs:
+  ping-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit App
+        run: |
+          curl -I https://predict-a9g9znwhduuvcawstsiex6.streamlit.app/

@@ -22,6 +22,15 @@ except:
     TELEGRAM_TOKEN = ""
     TELEGRAM_CHAT_ID = ""
 
+# --- CURĂȚARE SIGURĂ FIȘIERE CORUPTE ---
+for f_path in [PONTAJ_FILE, RAPOARTE_JSON, STATE_FILE, PRODUSE_FILE]:
+    if os.path.exists(f_path):
+        try:
+            with open(f_path, "r") as f:
+                json.load(f)
+        except:
+            os.remove(f_path) # Dacă fișierul este corupt, îl ștergem să nu blocheze aplicația
+
 if not os.path.exists(FILE_NAME): 
     open(FILE_NAME, "w").close()
 if not os.path.exists(PONTAJ_FILE):

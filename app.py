@@ -177,7 +177,6 @@ if s.get('tura_activa'):
             comenzi_efectuate = s.get('actual', 0) - s.get('start', 0)
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
             
-            # Salvare în JSON stabil
             rapoarte = incarca_rapoarte_json()
             rapoarte.append({
                 "id": datetime.now().strftime("%Y%m%d%H%M%S"),
@@ -281,7 +280,6 @@ with tab_disp:
             comenzi_efectuate = actual - start
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
             
-            # Salvare în JSON stabil
             rapoarte = incarca_rapoarte_json()
             rapoarte.append({
                 "id": datetime.now().strftime("%Y%m%d%H%M%S"),
@@ -507,7 +505,6 @@ with tab_centr:
         st.divider()
         df_rapoarte = pd.DataFrame(lista_rapoarte)
         
-        # Buton pentru trimiterea textului complet pe Telegram
         if st.button("📤 Trimite Centralizatorul pe Telegram", use_container_width=True):
             mesaj_centralizator = f"📊 *CENTRALIZATOR COMENZI PRESTO*\n\n"
             mesaj_centralizator += f"📦 *Total Comenzi:* {total_com}\n"

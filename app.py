@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 # --- CONFIGURARE FIȘIERE & SECRETE ---
 FILE_NAME = 'contacte.txt'
 PONTAJ_FILE = 'pontaj.json'
-DATA_DIR = "rapoarte_zilnice"
+RAPOARTE_JSON = 'rapoarte_salvate.json'
 STATE_FILE = "sesiune_persistenta.json"
 PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
@@ -22,17 +22,17 @@ except:
     TELEGRAM_TOKEN = ""
     TELEGRAM_CHAT_ID = ""
 
-if not os.path.exists(DATA_DIR): 
-    os.makedirs(DATA_DIR)
 if not os.path.exists(FILE_NAME): 
     open(FILE_NAME, "w").close()
 if not os.path.exists(PONTAJ_FILE):
     with open(PONTAJ_FILE, "w") as f:
         json.dump([], f)
+if not os.path.exists(RAPOARTE_JSON):
+    with open(RAPOARTE_JSON, "w") as f:
+        json.dump([], f)
 
 # --- FUNCȚIE TRIMITERE TELEGRAM ---
 def trimite_pe_telegram(mesaj):
-    """Trimite notificări text instant pe Telegram."""
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         return False
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -46,6 +46,19 @@ def trimite_pe_telegram(mesaj):
         return response.status_code == 200
     except:
         return False
+
+# --- FUNCȚII GESTIONARE RAPOARTE (JSON STABIL) ---
+def incarca_rapoarte_json():
+    if os.path.exists(RAPOARTE_JSON):
+        try:
+            with open(RAPOARTE_JSON, "r") as f:
+                return json.load(f)
+        except: pass
+    return []
+
+def salveaza_rapoarte_json(lista_rapoarte):
+    with open(RAPOARTE_JSON, "w") as f:
+        json.dump(lista_rapoarte, f, indent=4)
 
 # --- FUNCȚII PONTAJ ---
 def incarca_pontaj():
@@ -139,7 +152,7 @@ if st.sidebar.button("🧪 Testează Bot Telegram"):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         st.sidebar.error("Lipsesc TELEGRAM_TOKEN sau TELEGRAM_CHAT_ID din Streamlit Secrets!")
     else:
-        rezultat = trimite_pe_telegram("🤖 *Test reușit!* Botul Presto este activ și pregătit să trimită centralizatorul.")
+        rezultat = trimite_pe_telegram("🤖 *Test reușit!* Botul Presto este activ și pregătit să trimită rapoartele.")
         if rezultat:
             st.sidebar.success("Mesajul de test a fost trimis pe Telegram!")
         else:
@@ -163,12 +176,16 @@ if s.get('tura_activa'):
         if timp_acum - timp_inceput >= timedelta(hours=12):
             comenzi_efectuate = s.get('actual', 0) - s.get('start', 0)
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
-            ora_ro = timp_acum.strftime('%d_%m_%Y_%H%M%S')
-            nume_fisier = f"raport_{OPERATOR_NUME}_{ora_ro}.txt"
-            continut_raport = f"{OPERATOR_NUME}|{comenzi_efectuate}|{t_t}"
             
-            with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
-                f.write(continut_raport)
+            # Salvare în JSON stabil
+            rapoarte = incarca_rapoarte_json()
+            rapoarte.append({
+                "id": datetime.now().strftime("%Y%m%d%H%M%S"),
+                "Data": timp_inceput.strftime("%d.%m.%Y"),
+                "Comenzi": comenzi_efectuate,
+                "Target": t_t
+            })
+            salveaza_rapoarte_json(rapoarte)
             
             msg_tg = f"⏰ *Tura automată (12h) s-a încheiat!*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi totale: {comenzi_efectuate}\n🎯 Target total: {t_t:.2f} lei"
             trimite_pe_telegram(msg_tg)
@@ -190,7 +207,7 @@ if s.get('tura_activa'):
             s['tura_activa'] = None
             salveaza_sesiune(0, 0, [], None)
             
-            st.warning("⏰ Au trecut 12 ore! Tura a fost încheiată și raportul trimis pe Telegram.")
+            st.warning("⏰ Au trecut 12 ore! Tura a fost încheiată și salvată în baza de date.")
             st.rerun()
     except:
         pass
@@ -263,19 +280,23 @@ with tab_disp:
         if st.button("💾 Salvează și Închide Tura"):
             comenzi_efectuate = actual - start
             t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
-            ora_ro = datetime.now(ZoneInfo("Europe/Bucharest")).strftime('%d_%m_%Y_%H%M%S')
-            nume_fisier = f"raport_{OPERATOR_NUME}_{ora_ro}.txt"
-            continut_raport = f"{OPERATOR_NUME}|{comenzi_efectuate}|{t_t}"
             
-            with open(f"{DATA_DIR}/{nume_fisier}", "w") as f:
-                f.write(continut_raport)
+            # Salvare în JSON stabil
+            rapoarte = incarca_rapoarte_json()
+            rapoarte.append({
+                "id": datetime.now().strftime("%Y%m%d%H%M%S"),
+                "Data": datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%d.%m.%Y"),
+                "Comenzi": comenzi_efectuate,
+                "Target": t_t
+            })
+            salveaza_rapoarte_json(rapoarte)
             
             msg_tg = f"✅ *RAPORT TURĂ Încheiată*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi totale: *{comenzi_efectuate}*\n🎯 Target total acumulat: *{t_t:.2f} lei*"
             trimite_pe_telegram(msg_tg)
             
             salveaza_sesiune(0, 0, [], None)
             st.session_state['s_data'] = incarca_sesiune()
-            st.success("Tura a fost încheiată, salvată și raportul a fost trimis pe Telegram!")
+            st.success("Tura a fost încheiată, salvată în baza de date și raportul a fost trimis pe Telegram!")
             st.rerun()
 
     with c2:
@@ -434,28 +455,26 @@ with tab_centr:
     st.subheader("📊 Analiză, Istoric Ture & Pondere Produse")
     
     # --- ZONĂ ADĂUGARE RAPORT MANUAL ---
-    with st.expander("➕ Adaugă Manual un Raport Pierdut (Recuperare)", expanded=False):
-        st.write("Introdu detaliile unei ture anterioare pentru a o readăuga în centralizator:")
+    with st.expander("➕ Adaugă Manual un Raport în Centralizator", expanded=False):
+        st.write("Introdu detaliile unei ture pentru a o adăuga permanent în baza de date:")
         with st.form("formular_raport_manual"):
             data_manuala = st.date_input("Data raportului:", value=datetime.now(ZoneInfo("Europe/Bucharest")))
             comenzi_manuale = st.number_input("Număr comenzi:", min_value=0, value=10, step=1)
             target_manual = st.number_input("Valoare target (lei):", min_value=0.0, value=50.0, step=0.5, format="%.2f")
             
-            buton_salvare_manual = st.form_submit_button("💾 Salvează Raportul în Istoric")
+            buton_salvare_manual = st.form_submit_button("💾 Salvează în Baza de Date")
             if buton_salvare_manual:
-                z_str = data_manuala.strftime("%d")
-                l_str = data_manuala.strftime("%m")
-                a_str = data_manuala.strftime("%Y")
-                ora_unika = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H%M%S")
-                
-                nume_fisier_manual = f"raport_{OPERATOR_NUME}_{z_str}_{l_str}_{a_str}_{ora_unika}.txt"
-                continut_manual = f"{OPERATOR_NUME}|{comenzi_manuale}|{target_manual}"
-                
-                with open(f"{DATA_DIR}/{nume_fisier_manual}", "w") as f:
-                    f.write(continut_manual)
+                rapoarte = incarca_rapoarte_json()
+                rapoarte.append({
+                    "id": datetime.now().strftime("%Y%m%d%H%M%S"),
+                    "Data": data_manuala.strftime("%d.%m.%Y"),
+                    "Comenzi": int(comenzi_manuale),
+                    "Target": float(target_manual)
+                })
+                salveaza_rapoarte_json(rapoarte)
                 
                 trimite_pe_telegram(f"📝 *Raport adăugat manual*\n📅 Data: {data_manuala.strftime('%d.%m.%Y')}\n📦 Comenzi: {comenzi_manuale}\n🎯 Target: {target_manual:.2f} lei")
-                st.success("Raportul a fost adăugat cu succes în centralizator!")
+                st.success("Raportul a fost adăugat cu succes!")
                 st.rerun()
 
     if s['lista']:
@@ -476,43 +495,26 @@ with tab_centr:
         st.dataframe(df_stats, use_container_width=True)
         st.divider()
 
-    total_com, total_tgt = 0, 0
-    date_rapoarte = []
-    
-    for f_n in sorted(os.listdir(DATA_DIR)):
-        if not f_n.startswith("raport_"): continue
-        with open(f"{DATA_DIR}/{f_n}", "r") as f:
-            try:
-                op, com, tgt = f.read().split('|')
-                parti = f_n.split('_')
-                zi, luna, an = parti[2], parti[3], parti[4]
-                data_afis = f"{zi}.{luna}.{an}" 
-                
-                date_rapoarte.append({
-                    "Fișier": f_n, "Data": data_afis, 
-                    "Zi": zi, "Luna": luna, "An": an,
-                    "Comenzi": int(com), "Target": float(tgt)
-                })
-                total_com += int(com)
-                total_tgt += float(tgt)
-            except: continue
+    lista_rapoarte = incarca_rapoarte_json()
+    total_com = sum(r['Comenzi'] for r in lista_rapoarte)
+    total_tgt = sum(r['Target'] for r in lista_rapoarte)
 
     col_m1, col_m2 = st.columns(2)
     col_m1.metric("Total Comenzi", total_com)
     col_m2.metric("Total Target", f"{total_tgt:.2f} lei")
     
-    if date_rapoarte:
+    if lista_rapoarte:
         st.divider()
-        df_rapoarte = pd.DataFrame(date_rapoarte)
+        df_rapoarte = pd.DataFrame(lista_rapoarte)
         
-        # Buton pentru trimiterea textului complet al centralizatorului pe Telegram
+        # Buton pentru trimiterea textului complet pe Telegram
         if st.button("📤 Trimite Centralizatorul pe Telegram", use_container_width=True):
             mesaj_centralizator = f"📊 *CENTRALIZATOR COMENZI PRESTO*\n\n"
             mesaj_centralizator += f"📦 *Total Comenzi:* {total_com}\n"
             mesaj_centralizator += f"🎯 *Total Target:* {total_tgt:.2f} lei\n\n"
             mesaj_centralizator += "📋 *Istoric Ture:*\n"
             
-            for r in date_rapoarte:
+            for r in lista_rapoarte:
                 mesaj_centralizator += f"• Data: {r['Data']} | Comenzi: {r['Comenzi']} | Target: {r['Target']:.2f} lei\n"
             
             succes_tg = trimite_pe_telegram(mesaj_centralizator)
@@ -527,60 +529,50 @@ with tab_centr:
         st.bar_chart(df_grafic, x="Data", y="Comenzi", color="#ff4b4b")
         
         st.divider()
-        st.write("📋 **Istoric Detaliat Ture (Editează Data / Comenzi / Target sau Șterge)**")
+        st.write("📋 **Istoric Detaliat Ture (Editează sau Șterge)**")
         
-        for rand in date_rapoarte:
+        for rand in lista_rapoarte:
             with st.container(border=True):
                 c_info, c_ed, c_del = st.columns([0.6, 0.2, 0.2])
                 c_info.write(f"📄 **{rand['Data']}** | {rand['Comenzi']} com | {rand['Target']:.2f} lei")
                 
-                editeaza_apasat = c_ed.button("✏️ Editează", key=f"edit_btn_{rand['Fișier']}")
+                editeaza_apasat = c_ed.button("✏️ Editează", key=f"edit_btn_{rand['id']}")
                 
-                if c_del.button("❌ Șterge", key=f"del_{rand['Fișier']}"): 
-                    os.remove(f"{DATA_DIR}/{rand['Fișier']}")
+                if c_del.button("❌ Șterge", key=f"del_{rand['id']}"): 
+                    lista_rapoarte = [r for r in lista_rapoarte if r['id'] != rand['id']]
+                    salveaza_rapoarte_json(lista_rapoarte)
                     st.rerun()
                 
                 if editeaza_apasat:
-                    st.session_state[f"is_editing_{rand['Fișier']}"] = True
+                    st.session_state[f"is_editing_{rand['id']}"] = True
                 
-                if st.session_state.get(f"is_editing_{rand['Fișier']}", False):
-                    with st.form(key=f"form_edit_{rand['Fișier']}"):
-                        st.write(f"Modificare raport: {rand['Fișier']}")
+                if st.session_state.get(f"is_editing_{rand['id']}", False):
+                    with st.form(key=f"form_edit_{rand['id']}"):
+                        st.write(f"Modificare raport din data: {rand['Data']}")
                         
                         data_curenta_obj = datetime.strptime(rand['Data'], "%d.%m.%Y")
-                        noua_data = st.date_input("Data raportului:", value=data_curenta_obj)
+                        noua_data = st.date_input("Data raportului:", value=data_curenta_obj, key=f"d_inp_{rand['id']}")
                         
-                        nou_com = st.number_input("Comenzi:", value=rand['Comenzi'], step=1)
-                        nou_tgt = st.number_input("Target (lei):", value=rand['Target'], format="%.2f", step=0.1)
+                        nou_com = st.number_input("Comenzi:", value=rand['Comenzi'], step=1, key=f"c_inp_{rand['id']}")
+                        nou_tgt = st.number_input("Target (lei):", value=rand['Target'], format="%.2f", step=0.1, key=f"t_inp_{rand['id']}")
                         
                         col_salveaza, col_anuleaza = st.columns(2)
                         if col_salveaza.form_submit_button("Salvează Modificările"):
-                            n_zi = noua_data.strftime("%d")
-                            n_luna = noua_data.strftime("%m")
-                            n_an = noua_data.strftime("%Y")
-                            
-                            parti_vechi = rand['Fișier'].split('_')
-                            ora_veche = parti_vechi[5] if len(parti_vechi) > 5 else "000000.txt"
-                            
-                            nume_nou_fisier = f"raport_{OPERATOR_NUME}_{n_zi}_{n_luna}_{n_an}_{ora_veche}"
-                            
-                            if rand['Fișier'] != nume_nou_fisier:
-                                if os.path.exists(f"{DATA_DIR}/{rand['Fișier']}"):
-                                    os.remove(f"{DATA_DIR}/{rand['Fișier']}")
-                            
-                            continut_nou = f"{OPERATOR_NUME}|{nou_com}|{nou_tgt}"
-                            with open(f"{DATA_DIR}/{nume_nou_fisier}", "w") as f_out:
-                                f_out.write(continut_nou)
-                                
-                            st.session_state[f"is_editing_{rand['Fișier']}"] = False
+                            for r in lista_rapoarte:
+                                if r['id'] == rand['id']:
+                                    r['Data'] = noua_data.strftime("%d.%m.%Y")
+                                    r['Comenzi'] = int(nou_com)
+                                    r['Target'] = float(nou_tgt)
+                            salveaza_rapoarte_json(lista_rapoarte)
+                            st.session_state[f"is_editing_{rand['id']}"] = False
                             st.success("Modificat cu succes!")
                             st.rerun()
                             
                         if col_anuleaza.form_submit_button("Anulează"):
-                            st.session_state[f"is_editing_{rand['Fișier']}"] = False
+                            st.session_state[f"is_editing_{rand['id']}"] = False
                             st.rerun()
     else:
-        st.info("Nu există rapoarte salvate încă. Finalizează o tură sau adaugă un raport manual mai sus.")
+        st.info("Nu există rapoarte salvate încă în baza de date. Finalizează o tură sau adaugă un raport manual mai sus.")
 
 # ==========================================
 # 6. TAB ADMINISTRARE PRODUSE

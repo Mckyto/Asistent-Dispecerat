@@ -279,28 +279,47 @@ def sterge_livrator(livrator_id: int):
 def cauta_produse(termen: str = "") -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM produse WHERE activ = 1 AND nume LIKE ? ORDER BY nume COLLATE NOCASE LIMIT 20",
+            """
+            SELECT id, nume, valoare
+            FROM produse
+            WHERE activ = 1 AND nume LIKE ?
+            ORDER BY nume COLLATE NOCASE
+            LIMIT 20
+            """,
             (f"%{termen.strip()}%",),
         ).fetchall()
     return [dict(row) for row in rows]
 
+
 def adauga_produs(nume: str, valoare: float) -> tuple[bool, str]:
     nume = " ".join(nume.strip().split())
     valoare = safe_float(valoare)
+
     if len(nume) < 2:
         return False, "Numele produsului este prea scurt."
     if valoare < 0:
         return False, "Valoarea nu poate fi negativă."
+
     try:
         with get_db() as conn:
-            conn.execute("INSERT INTO produse (nume, valoare, activ, created_at) VALUES (?, ?, 1, ?)", (nume, valoare, iso_now()))
-        return True, f"Produsul {nume} a fost adăugat."
+            conn.execute(
+                """
+                INSERT INTO produse (nume, valoare, activ, created_at)
+                VALUES (?, ?, 1, ?)
+                """,
+                (nume, valoare, iso_now()),
+            )
+        return True, f"Produsul «{nume}» a fost adăugat."
     except sqlite3.IntegrityError:
-        return False, "Acest produs există deja."
+        return False, "Produsul există deja."
+
 
 def sterge_produs(produs_id: int):
     with get_db() as conn:
-        conn.execute("UPDATE produse SET activ = 0 WHERE id = ?", (int(produs_id),))
+        conn.execute(
+            "UPDATE produse SET activ = 0 WHERE id = ?",
+            (int(produs_id),),
+        )
 
 
 # ============================================================
@@ -548,18 +567,36 @@ with st.sidebar:
         )
 
     with st.expander("📦 Administrare Produse Target"):
-        with st.form("sidebar_add_product"):
-            nume_produs = st.text_input("Nume produs")
-            valoare_produs = st.number_input("Valoare target (lei)", min_value=0.0, step=0.5, format="%.2f")
+        with st.form("adauga_produs_sidebar"):
+            nume = st.text_input("Nume produs")
+            valoare = st.number_input(
+                "Valoare target (lei)",
+                min_value=0.0,
+                step=0.5,
+                format="%.2f",
+            )
+
             if st.form_submit_button("➕ Adaugă produs"):
-                ok, mesaj = adauga_produs(nume_produs, valoare_produs)
-                if ok: st.success(mesaj); st.rerun()
-                else: st.error(mesaj)
-        for produs in cauta_produse(""):
-            ca, cb = st.columns([0.75, 0.25])
-            ca.caption(f"{produs['nume']} — {float(produs['valoare']):.2f} lei")
-            if cb.button("✕", key=f"delete_product_{produs['id']}"):
-                sterge_produs(produs['id']); st.rerun()
+                ok, mesaj = adauga_produs(nume, valoare)
+                if ok:
+                    st.success(mesaj)
+                    st.rerun()
+                else:
+                    st.error(mesaj)
+
+        produse = cauta_produse("")
+        if produse:
+            for produs in produse:
+                ca, cb = st.columns([0.78, 0.22])
+                ca.caption(
+                    f"{produs['nume']} — {produs['valoare']:.2f} lei"
+                )
+                if cb.button(
+                    "✕",
+                    key=f"delete_produs_{produs['id']}",
+                ):
+                    sterge_produs(produs["id"])
+                    st.rerun()
 
     if st.button("🧪 Testează Bot Telegram", use_container_width=True):
         if not telegram_configured():
@@ -730,56 +767,172 @@ with tab_disp:
                 st.rerun()
 
     with c2:
-        with st.expander("🎯 Target — caută produs și confirmă", expanded=True):
-            s = get_session()
-            st.metric("Target curent", f"{float(s['target']):.2f} lei")
-            st.caption("Caută produsul, selectează rezultatul și apasă Enter/Confirmă.")
+        with st.expander(
+            "🎯 Target — caută produs + Enter",
+            expanded=True,
+        ):
+            s_target = get_session()
+            target_curent = float(s_target["target"])
+
+            st.metric("Target curent", f"{target_curent:.2f} lei")
+
             if "target_produse" not in st.session_state:
                 st.session_state.target_produse = []
 
-            cautare_produs = st.text_input("🔎 Caută produs:", placeholder="Ex.: pizza, cola, burger...", key="target_product_search")
-            produse = cauta_produse(cautare_produs)
+            # Câmpul este un formular: Enter = submit.
+            with st.form("target_search_form", clear_on_submit=True):
+                cautare = st.text_input(
+                    "🔎 Caută produs și apasă Enter:",
+                    placeholder="Ex.: pizza, cola, burger...",
+                )
+                cauta = st.form_submit_button(
+                    "↵ Caută / Confirmă",
+                    type="primary",
+                    use_container_width=True,
+                )
 
-            if cautare_produs.strip():
-                if produse:
-                    with st.form("confirmare_produs_target", clear_on_submit=True):
-                        optiuni = {f"{p['nume']} — {p['valoare']:.2f} lei": p for p in produse}
-                        ales = st.radio("Rezultate:", list(optiuni.keys()))
-                        if st.form_submit_button("↵ Confirmă și adaugă", type="primary"):
-                            produs = optiuni[ales]
-                            st.session_state.target_produse.append(produs)
-                            s2 = get_session()
-                            save_session(s2['start_comenzi'], s2['actual_comenzi'], float(s2['target']) + float(produs['valoare']), s2['tura_activa'])
-                            st.success(f"Adăugat: {produs['nume']} (+{float(produs['valoare']):.2f} lei)")
-                            st.rerun()
+            if cauta and cautare.strip():
+                rezultate = cauta_produse(cautare)
+
+                if len(rezultate) == 1:
+                    # Dacă există un singur rezultat, Enter îl confirmă direct.
+                    produs = rezultate[0]
+
+                    st.session_state.target_produse.append(produs)
+
+                    nou_target = target_curent + float(produs["valoare"])
+                    save_session(
+                        s_target["start_comenzi"],
+                        s_target["actual_comenzi"],
+                        nou_target,
+                        s_target["tura_activa"],
+                    )
+
+                    st.success(
+                        f"✓ {produs['nume']} +{produs['valoare']:.2f} lei"
+                    )
+                    st.rerun()
+
+                elif len(rezultate) > 1:
+                    st.session_state.target_rezultate = rezultate
+                    st.session_state.target_cautare = cautare.strip()
+                    st.rerun()
+
                 else:
-                    st.warning(f"Nu am găsit produsul „{cautare_produs}”.")
-                    with st.expander("➕ Adaugă produs nou"):
-                        with st.form("adaugare_produs"):
-                            nume_nou = st.text_input("Nume produs:", value=cautare_produs)
-                            valoare_noua = st.number_input("Valoare target (lei):", min_value=0.0, step=0.5, format="%.2f")
-                            if st.form_submit_button("Salvează produsul"):
-                                ok, mesaj = adauga_produs(nume_nou, valoare_noua)
-                                if ok: st.success(mesaj); st.rerun()
-                                else: st.error(mesaj)
+                    st.warning(
+                        f"Nu există produsul «{cautare.strip()}»."
+                    )
 
-            if st.session_state.target_produse:
-                st.divider(); st.write("**Produse adăugate în această sesiune:**")
-                for i, produs in enumerate(st.session_state.target_produse):
-                    cp, cd = st.columns([0.8, 0.2])
-                    cp.write(f"{i+1}. {produs['nume']} — {float(produs['valoare']):.2f} lei")
-                    if cd.button("✕", key=f"remove_target_product_{i}"):
-                        st.session_state.target_produse.pop(i)
-                        s2 = get_session()
-                        save_session(s2['start_comenzi'], s2['actual_comenzi'], max(0.0, float(s2['target']) - float(produs['valoare'])), s2['tura_activa'])
+            # Dacă sunt mai multe potriviri, alegi exact produsul.
+            rezultate = st.session_state.get("target_rezultate", [])
+
+            if rezultate:
+                st.write("**Mai multe produse găsite:**")
+
+                for produs in rezultate:
+                    c1, c2 = st.columns([0.78, 0.22])
+
+                    c1.write(
+                        f"**{produs['nume']}** — "
+                        f"{produs['valoare']:.2f} lei"
+                    )
+
+                    if c2.button(
+                        "CONFIRMĂ",
+                        key=f"confirm_produs_{produs['id']}",
+                        type="primary",
+                    ):
+                        s_now = get_session()
+                        nou_target = (
+                            float(s_now["target"])
+                            + float(produs["valoare"])
+                        )
+
+                        st.session_state.target_produse.append(produs)
+
+                        save_session(
+                            s_now["start_comenzi"],
+                            s_now["actual_comenzi"],
+                            nou_target,
+                            s_now["tura_activa"],
+                        )
+
+                        st.session_state.target_rezultate = []
+                        st.session_state.target_cautare = ""
+
+                        st.success(
+                            f"✓ {produs['nume']} adăugat — "
+                            f"+{produs['valoare']:.2f} lei"
+                        )
                         st.rerun()
 
-            if st.button("RESET TARGET", key="reset_target_products"):
-                s2 = get_session()
-                save_session(s2['start_comenzi'], s2['actual_comenzi'], 0.0, s2['tura_activa'])
+                if st.button(
+                    "✕ Închide rezultatele",
+                    key="close_target_results",
+                ):
+                    st.session_state.target_rezultate = []
+                    st.rerun()
+
+            # Produsele deja adăugate în target.
+            if st.session_state.target_produse:
+                st.divider()
+                st.write("**Produse adăugate:**")
+
+                for i, produs in enumerate(
+                    st.session_state.target_produse
+                ):
+                    c1, c2 = st.columns([0.85, 0.15])
+
+                    c1.write(
+                        f"{i + 1}. {produs['nume']} — "
+                        f"{float(produs['valoare']):.2f} lei"
+                    )
+
+                    if c2.button(
+                        "✕",
+                        key=f"remove_target_{i}_{produs['id']}",
+                    ):
+                        s_now = get_session()
+                        nou_target = max(
+                            0.0,
+                            float(s_now["target"])
+                            - float(produs["valoare"]),
+                        )
+
+                        st.session_state.target_produse.pop(i)
+
+                        save_session(
+                            s_now["start_comenzi"],
+                            s_now["actual_comenzi"],
+                            nou_target,
+                            s_now["tura_activa"],
+                        )
+                        st.rerun()
+
+            if st.button(
+                "RESET TARGET",
+                key="reset_target_products",
+                use_container_width=True,
+            ):
+                s_now = get_session()
+
+                save_session(
+                    s_now["start_comenzi"],
+                    s_now["actual_comenzi"],
+                    0.0,
+                    s_now["tura_activa"],
+                )
+
                 st.session_state.target_produse = []
-                st.success("Targetul a fost resetat.")
+                st.session_state.target_rezultate = []
+
+                st.success("Target resetat.")
                 st.rerun()
+
+            st.caption(
+                "Flux rapid: scrii produsul → Enter. "
+                "Dacă există o singură potrivire, se adaugă direct."
+            )
 
 
 # ============================================================

@@ -1,5 +1,3 @@
-requests
-python-dotenv
-pandas
-schedule
-streamlit
+streamlit>=1.37,<2
+pandas>=2.2,<3
+requests>=2.32,<3

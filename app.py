@@ -11,7 +11,6 @@ FILE_NAME = 'contacte.txt'
 PONTAJ_FILE = 'pontaj.json'
 RAPOARTE_JSON = 'rapoarte_salvate.json'
 STATE_FILE = "sesiune_persistenta.json"
-PRODUSE_FILE = "produse.json"
 OPERATOR_NUME = "Operator"
 
 # Preluare sigură a secretelor de Telegram din Streamlit Secrets
@@ -23,13 +22,13 @@ except:
     TELEGRAM_CHAT_ID = ""
 
 # --- CURĂȚARE SIGURĂ FIȘIERE CORUPTE ---
-for f_path in [PONTAJ_FILE, RAPOARTE_JSON, STATE_FILE, PRODUSE_FILE]:
+for f_path in [PONTAJ_FILE, RAPOARTE_JSON, STATE_FILE]:
     if os.path.exists(f_path):
         try:
             with open(f_path, "r") as f:
                 json.load(f)
         except:
-            os.remove(f_path) # Dacă fișierul este corupt, îl ștergem să nu blocheze aplicația
+            os.remove(f_path)
 
 if not os.path.exists(FILE_NAME): 
     open(FILE_NAME, "w").close()
@@ -83,9 +82,9 @@ def salveaza_pontaj(lista_pontaj):
         json.dump(lista_pontaj, f)
 
 # --- FUNCȚII PERSISTENȚĂ SESIUNE ---
-def salveaza_sesiune(start, actual, lista, tura_activa=None):
+def salveaza_sesiune(start, actual, target_manual_val, tura_activa=None):
     with open(STATE_FILE, "w") as f:
-        json.dump({"start": start, "actual": actual, "lista": lista, "tura_activa": tura_activa}, f)
+        json.dump({"start": start, "actual": actual, "target_manual_val": target_manual_val, "tura_activa": tura_activa}, f)
 
 def incarca_sesiune():
     if os.path.exists(STATE_FILE):
@@ -95,42 +94,11 @@ def incarca_sesiune():
                 return {
                     "start": data.get("start", 0), 
                     "actual": data.get("actual", 0), 
-                    "lista": data.get("lista", []),
+                    "target_manual_val": data.get("target_manual_val", 0.0),
                     "tura_activa": data.get("tura_activa", None)
                 }
         except: pass
-    return {"start": 0, "actual": 0, "lista": [], "tura_activa": None}
-
-# --- FUNCȚII GESTIONARE PRODUSE ---
-def incarca_produse():
-    if os.path.exists(PRODUSE_FILE):
-        try:
-            with open(PRODUSE_FILE, "r") as f:
-                produse = json.load(f)
-                if "Placinta cu iaurt" in produse:
-                    produse["Placinta cu mere"] = produse.pop("Placinta cu iaurt")
-                    salveaza_produse(produse)
-                return produse
-        except: pass
-    
-    produse_default = {
-        "Baclava": 1.0, "Tiramisu": 1.0, "Cheesecake": 1.0, "Kataif": 1.0, 
-        "Placinta cu mere": 1.0, "Salam de biscuiti": 1.0, "Gogosi": 1.0, 
-        "Bucket gogosi": 1.0, "Inghetata": 1.0, "Limonada": 1.0, 
-        "Hamburger pui": 0.2, "Painica mare": 0.5, "Paste Quattro Formaggi": 1.0, 
-        "Pizza Napoletta": 1.0, "Painica napolettana": 0.5, "Pita Gyros": 1.0, 
-        "Bere Porst": 0.5, "Shaorma cu pui crispy": 0.5, "Salata de pui crispy": 0.3, 
-        "Mozzarella": 0.3, "Grana padano": 1.0, "Vita tibetana": 1.0, 
-        "Pui ZAO": 1.0, "Mix de fructe prajit/in caramel": 1.0, "Lapte prajit": 1.0, 
-        "Pui sichuan": 1.0, "Wings bucket": 2.0, "Apa BAX": 2.0
-    }
-    with open(PRODUSE_FILE, "w") as f:
-        json.dump(produse_default, f)
-    return produse_default
-
-def salveaza_produse(produse_dict):
-    with open(PRODUSE_FILE, "w") as f:
-        json.dump(produse_dict, f)
+    return {"start": 0, "actual": 0, "target_manual_val": 0.0, "tura_activa": None}
 
 # --- FUNCȚII LIVRATORI ---
 def incarca_livratori():
@@ -170,8 +138,6 @@ if st.sidebar.button("🧪 Testează Bot Telegram"):
 # --- INITIALIZARE SESSION STATE ---
 if 's_data' not in st.session_state:
     st.session_state['s_data'] = incarca_sesiune()
-if 'produse_bonus' not in st.session_state:
-    st.session_state['produse_bonus'] = incarca_produse()
 
 s = st.session_state['s_data']
 
@@ -184,7 +150,7 @@ if s.get('tura_activa'):
         
         if timp_acum - timp_inceput >= timedelta(hours=12):
             comenzi_efectuate = s.get('actual', 0) - s.get('start', 0)
-            t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
+            t_t = s.get('target_manual_val', 0.0)
             
             rapoarte = incarca_rapoarte_json()
             rapoarte.append({
@@ -211,9 +177,9 @@ if s.get('tura_activa'):
             
             s['start'] = 0
             s['actual'] = 0
-            s['lista'] = []
+            s['target_manual_val'] = 0.0
             s['tura_activa'] = None
-            salveaza_sesiune(0, 0, [], None)
+            salveaza_sesiune(0, 0, 0.0, None)
             
             st.warning("⏰ Au trecut 12 ore! Tura a fost încheiată și salvată în baza de date.")
             st.rerun()
@@ -221,13 +187,12 @@ if s.get('tura_activa'):
         pass
 
 # --- ORGANIZARE TAB-URI ---
-tab_livr, tab_disp, tab_calc, tab_pontaj, tab_centr, tab_admin = st.tabs([
+tab_livr, tab_disp, tab_calc, tab_pontaj, tab_centr = st.tabs([
     "🛵 Gestionare Livratori", 
     "⚙️ Dispecerat & Target", 
     "🧮 Calculator Procent",
     "🕐 Pontaj", 
-    "📊 Centralizator", 
-    "🛠️ Admin Produse"
+    "📊 Centralizator"
 ])
 
 # ==========================================
@@ -272,7 +237,7 @@ with tab_disp:
     if start != s.get('start', 0) or actual != s.get('actual', 0):
         s['start'] = start
         s['actual'] = actual
-        salveaza_sesiune(s['start'], s['actual'], s['lista'], s.get('tura_activa'))
+        salveaza_sesiune(s['start'], s['actual'], s['target_manual_val'], s.get('tura_activa'))
     
     st.info(f"✅ {actual - start} comenzi în total.")
     
@@ -287,7 +252,7 @@ with tab_disp:
 
         if st.button("💾 Salvează și Închide Tura"):
             comenzi_efectuate = actual - start
-            t_t = sum(float(str(i['val']).replace(' lei', '')) for i in s['lista'])
+            t_t = s.get('target_manual_val', 0.0)
             
             rapoarte = incarca_rapoarte_json()
             rapoarte.append({
@@ -301,44 +266,25 @@ with tab_disp:
             msg_tg = f"✅ *RAPORT TURĂ Încheiată*\n👤 Operator: {OPERATOR_NUME}\n📦 Comenzi totale: *{comenzi_efectuate}*\n🎯 Target total acumulat: *{t_t:.2f} lei*"
             trimite_pe_telegram(msg_tg)
             
-            salveaza_sesiune(0, 0, [], None)
+            salveaza_sesiune(0, 0, 0.0, None)
             st.session_state['s_data'] = incarca_sesiune()
             st.success("Tura a fost încheiată, salvată în baza de date și raportul a fost trimis pe Telegram!")
             st.rerun()
 
     with c2:
-        with st.expander("🎯 Target (Toate Produsele Active)", expanded=True):
-            for produs, val in st.session_state['produse_bonus'].items():
-                cols = st.columns([0.6, 0.2, 0.2])
-                cols[0].markdown(f"**{produs}** `({val} lei)`")
-                if cols[1].button("➖", key=f"sub_{produs}"):
-                    for i in reversed(range(len(s['lista']))):
-                        if s['lista'][i]['nume'] == produs:
-                            del s['lista'][i]
-                            break
-                    salveaza_sesiune(s['start'], s['actual'], s['lista'], s.get('tura_activa'))
-                    st.rerun()
-                if cols[2].button("➕", key=f"add_{produs}"):
-                    ora = datetime.now(ZoneInfo("Europe/Bucharest")).strftime("%H:%M")
-                    s['lista'].append({"nume": produs, "val": float(val), "ora": ora})
-                    salveaza_sesiune(s['start'], s['actual'], s['lista'], s.get('tura_activa'))
-                    st.rerun()
+        with st.expander("🎯 Target (Scrie suma direct)", expanded=True):
+            target_introdus = st.number_input("Introdu valoarea targetului (lei):", value=float(s.get('target_manual_val', 0.0)), format="%.2f", step=1.0)
             
-            if s['lista']:
-                st.divider()
-                st.write("📋 **Istoric adăugări:**")
-                df = pd.DataFrame(s['lista'])
-                cols_to_use = ['ora', 'nume', 'val']
-                if all(col in df.columns for col in cols_to_use):
-                    df_viz = df.copy()
-                    df_viz['val'] = df_viz['val'].apply(lambda x: f"{float(x):.2f} lei")
-                    st.table(df_viz[cols_to_use])
-                st.write(f"### Total: {sum(float(i['val']) for i in s['lista']):.2f} lei")
-                if st.button("RESET TARGET"): 
-                    s['lista'] = []
-                    salveaza_sesiune(s['start'], s['actual'], [], s.get('tura_activa'))
-                    st.success("Targetul a fost resetat!")
-                    st.rerun()
+            if target_introdus != s.get('target_manual_val', 0.0):
+                s['target_manual_val'] = target_introdus
+                salveaza_sesiune(s['start'], s['actual'], s['target_manual_val'], s.get('tura_activa'))
+            
+            st.write(f"### Target curent: {s.get('target_manual_val', 0.0):.2f} lei")
+            if st.button("RESET TARGET"): 
+                s['target_manual_val'] = 0.0
+                salveaza_sesiune(s['start'], s['actual'], 0.0, s.get('tura_activa'))
+                st.success("Targetul a fost resetat!")
+                st.rerun()
 
 # ==========================================
 # 3. TAB CALCULATOR PROCENT
@@ -404,7 +350,7 @@ with tab_pontaj:
         if st.button("🟢 Începe Tura (Check-in)", use_container_width=True):
              timp_acum = datetime.now(ZoneInfo("Europe/Bucharest"))
              s['tura_activa'] = timp_acum.strftime("%Y-%m-%d %H:%M:%S")
-             salveaza_sesiune(s.get('start', 0), s.get('actual', 0), s.get('lista', []), s['tura_activa'])
+             salveaza_sesiune(s.get('start', 0), s.get('actual', 0), s.get('target_manual_val', 0.0), s['tura_activa'])
              trimite_pe_telegram(f"🟢 *Check-in efectuat*\nTura a început la ora: `{timp_acum.strftime('%H:%M:%S')}`")
              st.success(f"Tura a început la ora {timp_acum.strftime('%H:%M:%S')}!")
              st.rerun()
@@ -432,7 +378,7 @@ with tab_pontaj:
                 trimite_pe_telegram(f"🔴 *Check-out efectuat*\nTura s-a încheiat. Total ore lucrate: *{ore_lucrate} ore*")
                 
                 s['tura_activa'] = None
-                salveaza_sesiune(s.get('start', 0), s.get('actual', 0), s.get('lista', []), None)
+                salveaza_sesiune(s.get('start', 0), s.get('actual', 0), 0.0, None)
                 st.success(f"Tura a fost încheiată! Ai lucrat {ore_lucrate} ore.")
                 st.rerun()
             else:
@@ -456,10 +402,10 @@ with tab_pontaj:
         st.info("Nu există înregistrări în pontaj.")
 
 # ==========================================
-# 5. TAB CENTRALIZATOR & STATISTICI PRODUSE
+# 5. TAB CENTRALIZATOR & STATISTICI
 # ==========================================
 with tab_centr:
-    st.subheader("📊 Analiză, Istoric Ture & Pondere Produse")
+    st.subheader("📊 Analiză & Istoric Ture")
     
     # --- ZONĂ ADĂUGARE RAPORT MANUAL ---
     with st.expander("➕ Adaugă Manual un Raport în Centralizator", expanded=False):
@@ -483,24 +429,6 @@ with tab_centr:
                 trimite_pe_telegram(f"📝 *Raport adăugat manual*\n📅 Data: {data_manuala.strftime('%d.%m.%Y')}\n📦 Comenzi: {comenzi_manuale}\n🎯 Target: {target_manual:.2f} lei")
                 st.success("Raportul a fost adăugat cu succes!")
                 st.rerun()
-
-    if s['lista']:
-        st.markdown("### 📈 Ponderea produselor în targetul turei curente")
-        df_curent = pd.DataFrame(s['lista'])
-        
-        df_stats = df_curent.groupby('nume').agg(
-            Bucati=('val', 'count'),
-            ValoareTotala=('val', 'sum')
-        ).reset_index()
-        
-        total_valoare_tura = df_stats['ValoareTotala'].sum()
-        df_stats['Procent (%)'] = (df_stats['ValoareTotala'] / total_valoare_tura * 100).round(2)
-        df_stats['ValoareTotala'] = df_stats['ValoareTotala'].apply(lambda x: f"{x:.2f} lei")
-        df_stats['Procent (%)'] = df_stats['Procent (%)'].apply(lambda x: f"{x}%")
-        
-        df_stats.columns = ["Produs", "Bucăți", "Valoare (lei)", "Procent din Target"]
-        st.dataframe(df_stats, use_container_width=True)
-        st.divider()
 
     lista_rapoarte = incarca_rapoarte_json()
     total_com = sum(r['Comenzi'] for r in lista_rapoarte)
@@ -579,38 +507,3 @@ with tab_centr:
                             st.rerun()
     else:
         st.info("Nu există rapoarte salvate încă în baza de date. Finalizează o tură sau adaugă un raport manual mai sus.")
-
-# ==========================================
-# 6. TAB ADMINISTRARE PRODUSE
-# ==========================================
-with tab_admin:
-    st.subheader("➕ Adaugă sau Actualizează Produs")
-    
-    with st.container(border=True):
-        c_nume, c_val, c_btn = st.columns([0.5, 0.25, 0.25])
-        nume_p = c_nume.text_input("Nume Produs:", key="input_nume_p")
-        valoare_p = c_val.number_input("Valoare (lei):", min_value=0.0, step=0.1, format="%.2f")
-        
-        c_btn.write("") 
-        c_btn.write("")
-        if c_btn.button("Salvează", use_container_width=True):
-            if nume_p.strip():
-                st.session_state['produse_bonus'][nume_p.strip()] = valoare_p
-                salveaza_produse(st.session_state['produse_bonus'])
-                st.success(f"Salvat: {nume_p}")
-                st.rerun()
-            else:
-                st.warning("Introdu un nume valid.")
-
-    st.subheader("📋 Catalog Produse Active")
-    cautare_p = st.text_input("🔎 Caută în meniu...")
-    
-    for prod, val in list(st.session_state['produse_bonus'].items()):
-        if cautare_p.lower() in prod.lower():
-            with st.container(border=True):
-                col_info, col_del = st.columns([0.8, 0.2])
-                col_info.markdown(f"**{prod}** — {val} lei")
-                if col_del.button("Șterge", key=f"del_p_{prod}", type="secondary", use_container_width=True):
-                    del st.session_state['produse_bonus'][prod]
-                    salveaza_produse(st.session_state['produse_bonus'])
-                    st.rerun()

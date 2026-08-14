@@ -1,10 +1,6 @@
 import streamlit as st
-import sqlite3
 
 # --- CONFIGURARE ---
-DB_NAME = "presto.db"
-
-# Produse actualizate conform tabelului din imagine
 PRODUSE_INITIALE = [
     ("Baclava", 1.0), ("Tiramisu", 1.0), ("Cheesecake", 1.0), ("Kataif", 1.0),
     ("Placinta cu iaurt/cu mere", 1.0), ("Salam de biscuiti", 1.0), ("Gogosi", 1.0),
@@ -17,52 +13,31 @@ PRODUSE_INITIALE = [
     ("Apa BAX", 2.0)
 ]
 
-def init_db():
-    conn = sqlite3.connect(DB_NAME, timeout=20)
-    c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS produse (id INTEGER PRIMARY KEY, nume TEXT UNIQUE, valoare REAL)")
-    c.execute("CREATE TABLE IF NOT EXISTS sesiune (id INTEGER PRIMARY KEY, start INTEGER, actual INTEGER, target REAL)")
-    c.execute("INSERT OR IGNORE INTO sesiune (id, start, actual, target) VALUES (1, 0, 0, 0)")
-    for nume, valoare in PRODUSE_INITIALE:
-        try:
-            c.execute("INSERT INTO produse (nume, valoare) VALUES (?, ?)", (nume, valoare))
-        except sqlite3.IntegrityError:
-            pass
-    conn.commit()
-    conn.close()
-
-def get_data():
-    conn = sqlite3.connect(DB_NAME, timeout=20)
-    data = conn.execute("SELECT * FROM sesiune WHERE id=1").fetchone()
-    conn.close()
-    return {"start": data[1], "actual": data[2], "target": data[3]}
-
-def update_session(start, actual, target):
-    conn = sqlite3.connect(DB_NAME, timeout=20)
-    conn.execute("UPDATE sesiune SET start=?, actual=?, target=? WHERE id=1", (start, actual, target))
-    conn.commit()
-    conn.close()
-
 # --- UI ---
 st.set_page_config(page_title="Presto Dispecerat", layout="centered")
-init_db()
 
 st.title("🍕 Dispecerat Presto")
-s = get_data()
+
+# Inițializare stare în memorie (fără baza de date / fără salvare persistentă)
+if 'start' not in st.session_state:
+    st.session_state['start'] = 0
+if 'actual' not in st.session_state:
+    st.session_state['actual'] = 0
+if 'target' not in st.session_state:
+    st.session_state['target'] = 0.0
+
+if 'produse_custom' not in st.session_state:
+    st.session_state['produse_custom'] = {nume: val for nume, val in PRODUSE_INITIALE}
 
 tab_disp, tab_admin = st.tabs(["⚙️ Dispecerat", "📦 Admin Produse"])
 
 # --- TAB DISPECERAT ---
 with tab_disp:
     c1, c2 = st.columns(2)
-    new_start = c1.number_input("Start:", value=int(s['start']), step=1)
-    new_actual = c2.number_input("Actual:", value=int(s['actual']), step=1)
+    st.session_state['start'] = c1.number_input("Start:", value=int(st.session_state['start']), step=1)
+    st.session_state['actual'] = c2.number_input("Actual:", value=int(st.session_state['actual']), step=1)
 
-    if new_start != s['start'] or new_actual != s['actual']:
-        update_session(new_start, new_actual, s['target'])
-        st.rerun()
-
-    st.info(f"📦 Comenzi totale: {new_actual - new_start}")
+    st.info(f"📦 Comenzi totale: {st.session_state['actual'] - st.session_state['start']}")
 
     st.subheader("🎯 Adăugare Target")
     with st.form("search_form", clear_on_submit=False):
@@ -70,13 +45,11 @@ with tab_disp:
         submit = st.form_submit_button("Caută")
 
     if submit and query:
-        conn = sqlite3.connect(DB_NAME, timeout=20)
-        res = conn.execute("SELECT * FROM produse WHERE nume LIKE ?", (f"%{query}%",)).fetchall()
-        conn.close()
+        res = [(n, v) for n, v in st.session_state['produse_custom'].items() if query.lower() in n.lower()]
         
         if len(res) == 1:
-            update_session(new_start, new_actual, s['target'] + res[0][2])
-            st.success(f"Adăugat: {res[0][1]} (+{res[0][2]} lei)")
+            st.session_state['target'] += res[0][1]
+            st.success(f"Adăugat: {res[0][0]} (+{res[0][1]} lei)")
             st.rerun()
         elif len(res) > 1:
             st.session_state['res_list'] = res
@@ -85,17 +58,17 @@ with tab_disp:
 
     if 'res_list' in st.session_state:
         res = st.session_state['res_list']
-        optiuni = {f"{p[1]} ({p[2]} lei)": p for p in res}
+        optiuni = {f"{p[0]} ({p[1]} lei)": p for p in res}
         sel = st.selectbox("Alege produsul:", options=list(optiuni.keys()))
         if st.button("Confirmă Adăugarea"):
             p_ales = optiuni[sel]
-            update_session(new_start, new_actual, s['target'] + p_ales[2])
+            st.session_state['target'] += p_ales[1]
             del st.session_state['res_list']
             st.rerun()
 
-    st.metric("🎯 Target Acumulat", f"{s['target']:.2f} lei")
+    st.metric("🎯 Target Acumulat", f"{st.session_state['target']:.2f} lei")
     if st.button("Reset Target"):
-        update_session(new_start, new_actual, 0.0)
+        st.session_state['target'] = 0.0
         st.rerun()
 
 # --- TAB ADMIN ---
@@ -106,30 +79,22 @@ with tab_admin:
         n_val = st.number_input("Valoare (lei)", step=0.1, min_value=0.0)
         if st.form_submit_button("Salvează"):
             if n_nume.strip():
-                conn = sqlite3.connect(DB_NAME, timeout=20)
-                try:
-                    conn.execute("INSERT INTO produse (nume, valoare) VALUES (?, ?)", (n_nume.strip(), n_val))
-                    conn.commit()
+                nume_curat = n_nume.strip()
+                if nume_curat in st.session_state['produse_custom']:
+                    st.error("Eroare: Produsul există deja!")
+                else:
+                    st.session_state['produse_custom'][nume_curat] = n_val
                     st.success("Produs adăugat!")
                     st.rerun()
-                except sqlite3.IntegrityError:
-                    st.error("Eroare: Produsul există deja!")
-                finally:
-                    conn.close()
 
     st.divider()
     st.subheader("📋 Produse Existente")
-    conn = sqlite3.connect(DB_NAME, timeout=20)
-    prods = conn.execute("SELECT * FROM produse ORDER BY nume").fetchall()
-    conn.close()
     
-    for p in prods:
+    produse_sortate = sorted(st.session_state['produse_custom'].items())
+    for nume, valoare in produse_sortate:
         col_n, col_v, col_d = st.columns([0.5, 0.3, 0.2])
-        col_n.write(p[1])
-        col_v.write(f"{p[2]:.2f} lei")
-        if col_d.button("Șterge", key=f"del_{p[0]}"):
-            conn = sqlite3.connect(DB_NAME, timeout=20)
-            conn.execute("DELETE FROM produse WHERE id=?", (p[0],))
-            conn.commit()
-            conn.close()
+        col_n.write(nume)
+        col_v.write(f"{valoare:.2f} lei")
+        if col_d.button("Șterge", key=f"del_{nume}"):
+            del st.session_state['produse_custom'][nume]
             st.rerun()

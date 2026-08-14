@@ -1,7 +1,7 @@
 import streamlit as st
 import sqlite3
 
-# --- CONFIGURARE BAZĂ DE DATE ---
+# --- CONFIGURARE ---
 DB_NAME = "presto.db"
 
 PRODUSE_INITIALE = [
@@ -17,7 +17,7 @@ PRODUSE_INITIALE = [
 ]
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=20)
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS produse (id INTEGER PRIMARY KEY, nume TEXT UNIQUE, valoare REAL)")
     c.execute("CREATE TABLE IF NOT EXISTS sesiune (id INTEGER PRIMARY KEY, start INTEGER, actual INTEGER, target REAL)")
@@ -26,33 +26,32 @@ def init_db():
         try:
             c.execute("INSERT INTO produse (nume, valoare) VALUES (?, ?)", (nume, valoare))
         except sqlite3.IntegrityError:
-            pass # Produsul exista deja
+            pass
     conn.commit()
     conn.close()
 
 def get_data():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=20)
     data = conn.execute("SELECT * FROM sesiune WHERE id=1").fetchone()
     conn.close()
     return {"start": data[1], "actual": data[2], "target": data[3]}
 
 def update_session(start, actual, target):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=20)
     conn.execute("UPDATE sesiune SET start=?, actual=?, target=? WHERE id=1", (start, actual, target))
     conn.commit()
     conn.close()
 
-# --- INTERFAȚA ---
+# --- UI ---
 st.set_page_config(page_title="Presto Dispecerat", layout="centered")
 init_db()
 
 st.title("🍕 Dispecerat Presto")
-
 s = get_data()
 
 tab_disp, tab_admin = st.tabs(["⚙️ Dispecerat", "📦 Admin Produse"])
 
-# --- TAB 1: DISPECERAT ---
+# --- TAB DISPECERAT ---
 with tab_disp:
     c1, c2 = st.columns(2)
     new_start = c1.number_input("Start:", value=int(s['start']), step=1)
@@ -70,7 +69,7 @@ with tab_disp:
         submit = st.form_submit_button("Caută")
 
     if submit and query:
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(DB_NAME, timeout=20)
         res = conn.execute("SELECT * FROM produse WHERE nume LIKE ?", (f"%{query}%",)).fetchall()
         conn.close()
         
@@ -98,7 +97,7 @@ with tab_disp:
         update_session(new_start, new_actual, 0.0)
         st.rerun()
 
-# --- TAB 2: ADMIN PRODUSE ---
+# --- TAB ADMIN ---
 with tab_admin:
     st.subheader("➕ Adaugă Produs Nou")
     with st.form("new_prod", clear_on_submit=True):
@@ -106,7 +105,7 @@ with tab_admin:
         n_val = st.number_input("Valoare (lei)", step=0.1, min_value=0.0)
         if st.form_submit_button("Salvează"):
             if n_nume.strip():
-                conn = sqlite3.connect(DB_NAME)
+                conn = sqlite3.connect(DB_NAME, timeout=20)
                 try:
                     conn.execute("INSERT INTO produse (nume, valoare) VALUES (?, ?)", (n_nume.strip(), n_val))
                     conn.commit()
@@ -114,11 +113,12 @@ with tab_admin:
                     st.rerun()
                 except sqlite3.IntegrityError:
                     st.error("Eroare: Produsul există deja!")
-                conn.close()
+                finally:
+                    conn.close()
 
     st.divider()
     st.subheader("📋 Produse Existente")
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=20)
     prods = conn.execute("SELECT * FROM produse ORDER BY nume").fetchall()
     conn.close()
     
@@ -127,7 +127,7 @@ with tab_admin:
         col_n.write(p[1])
         col_v.write(f"{p[2]:.2f} lei")
         if col_d.button("Șterge", key=f"del_{p[0]}"):
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_NAME, timeout=20)
             conn.execute("DELETE FROM produse WHERE id=?", (p[0],))
             conn.commit()
             conn.close()

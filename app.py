@@ -4,6 +4,7 @@ import sqlite3
 # --- CONFIGURARE ---
 DB_NAME = "presto.db"
 
+# Produse actualizate conform tabelului din imagine
 PRODUSE_INITIALE = [
     ("Baclava", 1.0), ("Tiramisu", 1.0), ("Cheesecake", 1.0), ("Kataif", 1.0),
     ("Placinta cu iaurt/cu mere", 1.0), ("Salam de biscuiti", 1.0), ("Gogosi", 1.0),

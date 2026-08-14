@@ -51,8 +51,14 @@ def get_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
-    try: yield conn
-    finally: conn.close()
+    try: 
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally: 
+        conn.close()
 
 def init_db():
     with get_db() as conn:
@@ -63,10 +69,16 @@ def init_db():
             CREATE TABLE IF NOT EXISTS rapoarte (id INTEGER PRIMARY KEY AUTOINCREMENT, data_raport TEXT, comenzi INTEGER, target REAL, operator TEXT, created_at TEXT);
             CREATE TABLE IF NOT EXISTS pontaj (id INTEGER PRIMARY KEY AUTOINCREMENT, operator TEXT, data_raport TEXT, check_in TEXT, check_out TEXT, total_ore REAL, created_at TEXT);
         """)
-        conn.execute("INSERT OR IGNORE INTO sesiune (id, updated_at) VALUES (1, ?)", (iso_now(),))
+        conn.execute("INSERT OR IGNORE INTO sesiune (id, start_comenzi, actual_comenzi, target, tura_activa, updated_at) VALUES (1, 0, 0, 0, NULL, ?)", (iso_now(),))
 
 def get_session(): 
-    with get_db() as conn: return dict(conn.execute("SELECT * FROM sesiune WHERE id=1").fetchone())
+    with get_db() as conn: 
+        row = conn.execute("SELECT * FROM sesiune WHERE id=1").fetchone()
+        if not row:
+            conn.execute("INSERT OR IGNORE INTO sesiune (id, start_comenzi, actual_comenzi, target, tura_activa, updated_at) VALUES (1, 0, 0, 0, NULL, ?)", (iso_now(),))
+            conn.commit()
+            row = conn.execute("SELECT * FROM sesiune WHERE id=1").fetchone()
+        return dict(row)
 
 def save_session(start, actual, target, tura_activa):
     with get_db() as conn:

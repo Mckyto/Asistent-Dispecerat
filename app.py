@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 
 # URL-ul Web App obținut de la Pasul 1 (înlocuiește cu link-ul tău)
-GOOGLE_SCRIPT_URL = "AICI_PUPI_LINKUL_PRIMIT_DE_LA_GOOGLE_APPS_SCRIPT"
+GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxIfS3cIqIy3RwCGIGONNyEyb1PdBSFYGGnpU5f6Rn6KRFsXyLYSKJ_OGooLnQ46JfQZw/exec"
 
 # --- CONFIGURARE GENERALĂ ---
 st.set_page_config(

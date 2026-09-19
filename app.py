@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 
 # --- CONFIGURARE GENERALĂ ---
-st.set_page_config(page_title="Presto - Dispecerat & Produse", page_icon="🍕", layout="wide")
-st.title("🍕 Panou Dispecerat & Produse - Presto")
+st.set_page_config(page_title="Presto - Panou Central", page_icon="🍕", layout="wide")
+st.title("🍕 Panou Central - Presto")
 
 # --- DATE INITIALE ADMIN ---
 PRODUSE_INITIALE = [
@@ -30,7 +30,11 @@ if 'produse_custom' not in st.session_state:
     st.session_state['produse_custom'] = {nume: val for nume, val in PRODUSE_INITIALE}
 
 # --- CREARE TABURI ---
-tab_disp, tab_admin = st.tabs(["⚙️ Dispecerat (Comenzi)", "📦 Admin Produse (Target)"])
+tab_disp, tab_admin, tab_calc = st.tabs([
+    "⚙️ Dispecerat (Comenzi)", 
+    "📦 Admin Produse (Target)", 
+    "🧮 Calculator Discounturi"
+])
 
 # ==========================================
 # 1. TAB DISPECERAT (COMENZI & TARGET)
@@ -107,3 +111,24 @@ with tab_admin:
         if col_d.button("Șterge", key=f"del_prod_{nume}"):
             del st.session_state['produse_custom'][nume]
             st.rerun()
+
+# ==========================================
+# 3. TAB CALCULATOR DISCOUNTURI
+# ==========================================
+with tab_calc:
+    st.header("🧮 Calculator Discounturi")
+    
+    col_c1, col_c2 = st.columns(2)
+    
+    with col_c1:
+        pret_initial = st.number_input("Preț inițial (lei):", min_value=0.0, value=100.0, step=1.0)
+        discount_procent = st.number_input("Discount (%):", min_value=0.0, max_value=100.0, value=10.0, step=1.0)
+    
+    # Calcul corect
+    valoare_discount = (pret_initial * discount_procent) / 100
+    pret_final = pret_initial - valoare_discount
+    
+    with col_c2:
+        st.markdown("### Rezultat:")
+        st.metric("Valoare Discount", f"- {valoare_discount:.2f} lei")
+        st.metric("Preț Final după Discount", f"{pret_final:.2f} lei")
